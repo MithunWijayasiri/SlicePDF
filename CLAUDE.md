@@ -1,54 +1,56 @@
 # SlicePDF
 
-Windows desktop PDF utility. Current feature: split one PDF into named files by inclusive page ranges. Target user is non-technical → GUI over CLI, minimal friction.
+Windows desktop PDF utility for page-level operations: split by named ranges, delete/keep pages, trim start/end, split by page count, reorder pages, merge PDFs. Target user is non-technical → GUI over CLI, minimal friction.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `slicepdf.py` | Single-file CustomTkinter GUI + split workflow. |
+| `slicepdf.py` | CustomTkinter GUI + operation dispatch. |
+| `pdf_operations.py` | Pure page-math/filename helpers; no UI imports. |
+| `test_pdf_operations.py` | `unittest` suite for `pdf_operations`. |
+| `test_app.py` | GUI-level `unittest` suite; skips when Tk cannot open a window. |
+| `assets/fonts/` | Bundled Manrope statics (400/700/800) + `OFL.txt`. |
 | `SlicePDF.bat` | Double-click launcher → `pythonw slicepdf.py` (no console). |
 | `SlicePDF.spec` | PyInstaller config; source of truth for builds. |
-| `requirements.txt` | Runtime deps: `customtkinter`, `pypdf`. |
-| `.github/workflows/build.yml` | CI on push + PR: compile, Ruff, PyInstaller build, `SlicePDF.exe` artifact. |
-| `README.md` | Public project and user instructions. |
-| `docs/plan.md` | Private roadmap; gitignored. |
+| `.github/workflows/build.yml` | CI on push + PR: compile, tests, Ruff, build, `SlicePDF.exe` artifact. |
+| `docs/plan.md` | Private roadmap. |
 
-`build/`, `dist/`, `*.pdf`, `.claude/` are gitignored.
+UI, font, and drag-and-drop specifics live in `.claude/rules/ui-design.md`, which loads automatically with `slicepdf.py`.
+
+`build/`, `dist/`, `*.pdf` are gitignored. `docs/` is **not** — keep the roadmap out of commits by staging explicit paths.
 
 ## Stack
 
-Python 3.14 · CustomTkinter · pypdf · PyInstaller.
+Python 3.14 · CustomTkinter · tkinterdnd2 · pypdf · PyInstaller.
 
 ## Run / build / check
 
 ```bash
 py slicepdf.py
+py -m unittest discover --verbose --pattern "test_*.py"
 py -m PyInstaller --clean --noconfirm SlicePDF.spec
-py -m ruff check slicepdf.py
+py -m ruff check slicepdf.py pdf_operations.py test_pdf_operations.py test_app.py
 ```
 
 Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
 
+`test_app.py` opens real (withdrawn) windows and runs the worker body inline: `after()` needs a mainloop `unittest` does not provide, so live thread marshalling stays manually verified.
+
 ## Behavior
 
 - Page numbers 1-based and inclusive; validated as `1 <= from <= to <= total`.
-- Blank rows ignored; at least one named range required.
-- Output name `<source>-split-<slug>.pdf`; duplicate slugs get numeric suffix; name with no alphanumerics → `chapter-N`.
-- Output folder defaults to the source PDF folder; a different folder can be selected.
-- Errors surface via `messagebox`: unreadable PDF, no file chosen, non-numeric or out-of-range pages, empty name, no chapters.
-- Split runs on a daemon thread; UI updates marshalled through `self.after()`.
+- Page expressions accept `2, 5-7, 12`. `delete`/`keep` dedupe silently; `reorder` rejects a repeated page (`parse_page_order`).
+- Blank named-range rows ignored; at least one named range required.
+- Never overwrite: `unique_filename()` + `open(..., "xb")`. Source PDF is read-only.
+- Output folder defaults to the source PDF folder; another can be chosen.
+- Errors surface via `messagebox`; operations run on a daemon thread with updates marshalled through `self.after()`.
 
 ## Rules
 
-- Dependency-light and single-file until a second operation justifies extraction.
+- Dependency-light; UI in `slicepdf.py`, page math in `pdf_operations.py`.
 - User-facing text plain and non-technical.
 - Long-running PDF work off the UI thread.
 - No machine-specific paths in `SlicePDF.spec`.
-- Add tests before extracting shared page-operation logic.
 - Unsigned executable may trigger a SmartScreen warning; signing out of scope.
 - Releases are manual; CI never creates them.
-
-## Planned
-
-Custom output names · delete selected pages · trim start/end · split by page count · keep/reorder pages · merge PDFs.
