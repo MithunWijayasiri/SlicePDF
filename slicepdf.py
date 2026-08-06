@@ -2,12 +2,12 @@
 import os
 import re
 import threading
-from typing import Callable
-
-import customtkinter as ctk
+from collections.abc import Callable
 from tkinter import filedialog, messagebox
 
+import customtkinter as ctk
 from pypdf import PdfReader, PdfWriter
+from pypdf.errors import PdfReadError
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -26,12 +26,18 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
 
 
-def output_filename(stem: str, name: str, index: int, used: dict[str, int]) -> str:
+def output_filename(
+    stem: str, name: str, index: int, used: dict[str, int], destination: str
+) -> str:
     slug = slugify(name) or f"chapter-{index}"
-    used[slug] = used.get(slug, 0) + 1
-    if used[slug] > 1:
-        slug = f"{slug}-{used[slug]}"
-    return f"{stem}-split-{slug}.pdf"
+    count = used.get(slug, 0)
+    while True:
+        count += 1
+        candidate_slug = slug if count == 1 else f"{slug}-{count}"
+        filename = f"{stem}-split-{candidate_slug}.pdf"
+        if not os.path.exists(os.path.join(destination, filename)):
+            used[slug] = count
+            return filename
 
 
 class ChapterRow:
@@ -169,7 +175,7 @@ class App(ctk.CTk):
             return
         try:
             self.total_pages = len(PdfReader(path).pages)
-        except Exception as e:
+        except (OSError, PdfReadError) as e:
             messagebox.showerror("Error", f"Could not read PDF:\n{e}")
             return
         self.pdf_path = path
@@ -235,12 +241,12 @@ class App(ctk.CTk):
                 writer = PdfWriter()
                 for page in range(start - 1, end):  # Convert inclusive 1-based range.
                     writer.add_page(reader.pages[page])
-                filename = output_filename(stem, name, index, used)
-                with open(os.path.join(destination, filename), "wb") as output_file:
+                filename = output_filename(stem, name, index, used, destination)
+                with open(os.path.join(destination, filename), "xb") as output_file:
                     writer.write(output_file)
                 self.after(0, self._tick, index / len(chapters), filename)
             self.after(0, self._done, len(chapters), destination)
-        except Exception as error:
+        except (OSError, PdfReadError) as error:
             self.after(0, self._fail, str(error))
 
     def set_status(self, text, color=MUTED):

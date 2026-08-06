@@ -53,10 +53,10 @@ Original-split-appendix.pdf
 
 ### Run from source
 
-Requirements: Python 3.14, `customtkinter`, and `pypdf`.
+Requirements: Python 3.14, `customtkinter`, `pypdf`, and PyInstaller for building the Windows executable.
 
 ```bash
-py -m pip install customtkinter pypdf
+py -m pip install customtkinter pypdf pyinstaller
 py slicepdf.py
 ```
 
@@ -67,7 +67,7 @@ Official Windows executables will be published on the [GitHub Releases page](htt
 ## Build the Windows executable
 
 ```bash
-py -m PyInstaller --onefile --windowed --name "SlicePDF" slicepdf.py
+py -m PyInstaller --clean --noconfirm SlicePDF.spec
 ```
 
 The executable is created in `dist/`.

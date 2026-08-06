@@ -46,7 +46,7 @@ Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
 - Long-running PDF work off the UI thread.
 - No machine-specific paths in `SlicePDF.spec`.
 - Add tests before extracting shared page-operation logic.
-- Unsigned executable triggers SmartScreen; signing out of scope.
+- Unsigned executable may trigger a SmartScreen warning; signing out of scope.
 - Releases are manual; CI never creates them.
 
 ## Planned
