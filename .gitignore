@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.env
+
+# Generated PDFs
+*.pdf
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Local tooling
+.claude/
+
+# Private planning notes
+docs/plan.md
