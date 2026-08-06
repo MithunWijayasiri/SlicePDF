@@ -30,12 +30,12 @@ def tk_available() -> bool:
 TK_AVAILABLE = tk_available()
 
 
-def make_pdf(directory: str, name: str, pages: int) -> str:
-    """Write a blank PDF of the given length and return its path."""
+def make_pdf(directory: str, name: str, pages: int, first_width: int = 200) -> str:
+    """Write a blank PDF and return its path. Page widths ascend so page identity is checkable."""
     path = os.path.join(directory, name)
     writer = PdfWriter()
-    for _ in range(pages):
-        writer.add_blank_page(width=200, height=200)
+    for offset in range(pages):
+        writer.add_blank_page(width=first_width + offset, height=200)
     with open(path, "wb") as handle:
         writer.write(handle)
     return path
@@ -60,7 +60,7 @@ class AppTestCase(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.work = directory.name
         self.source = make_pdf(self.work, "source.pdf", 6)
-        self.second = make_pdf(self.work, "appendix.pdf", 2)
+        self.second = make_pdf(self.work, "appendix.pdf", 2, first_width=300)
 
         self.app = slicepdf.App()
         self.app.withdraw()
@@ -253,22 +253,30 @@ class DropZoneTests(AppTestCase):
 class OperationOutputTests(AppTestCase):
     """The worker body runs inline here: after() needs a mainloop unittest does not run."""
 
-    def run_operation(self, mode, payload, paths=None, destination=None):
-        self.app.change_operation(mode)
-        self.app.pdf_paths = paths or [self.source]
-        self.app.total_pages = 6
-        self.app.out_dir = destination or tempfile.mkdtemp(dir=self.work)
+    def run_inline(self, mode, paths, payload):
+        """Run the worker body on this thread, with after() calling straight through."""
         def immediate(_delay, callback=None, *args):
             if callback:
                 callback(*args)
 
         with mock.patch.object(self.app, "after", immediate):
-            self.app._run(mode, self.app.pdf_paths, payload)
+            self.app._run(mode, paths, payload)
+
+    def run_operation(self, mode, payload, paths=None, destination=None):
+        self.app.change_operation(mode)
+        self.app.pdf_paths = paths or [self.source]
+        self.app.total_pages = 6
+        self.app.out_dir = destination or tempfile.mkdtemp(dir=self.work)
+        self.run_inline(mode, self.app.pdf_paths, payload)
         return self.app.out_dir
 
     def page_counts(self, directory):
         return {name: len(PdfReader(os.path.join(directory, name)).pages)
                 for name in sorted(os.listdir(directory))}
+
+    def page_widths(self, directory, name):
+        """Page widths of one output, which identify the source pages and their order."""
+        return [int(page.mediabox.width) for page in PdfReader(os.path.join(directory, name)).pages]
 
     def test_named_ranges_write_one_file_each(self):
         out = self.run_operation("named", [("Intro", 1, 2), ("Body", 3, 6)])
@@ -284,7 +292,7 @@ class OperationOutputTests(AppTestCase):
 
     def test_reorder_writes_the_requested_order(self):
         out = self.run_operation("reorder", ("3, 1-2", "order.pdf"))
-        self.assertEqual(self.page_counts(out), {"order.pdf": 3})
+        self.assertEqual(self.page_widths(out, "order.pdf"), [202, 200, 201])
 
     def test_trim_removes_pages_from_both_ends(self):
         out = self.run_operation("trim", (1, 2, "trim.pdf"))
@@ -296,7 +304,7 @@ class OperationOutputTests(AppTestCase):
 
     def test_merge_joins_sources_in_order(self):
         out = self.run_operation("merge", "all.pdf", paths=[self.source, self.second])
-        self.assertEqual(self.page_counts(out), {"all.pdf": 8})
+        self.assertEqual(self.page_widths(out, "all.pdf"), [200, 201, 202, 203, 204, 205, 300, 301])
 
     def test_existing_output_is_never_overwritten(self):
         destination = tempfile.mkdtemp(dir=self.work)
@@ -306,6 +314,13 @@ class OperationOutputTests(AppTestCase):
         with open(os.path.join(destination, "keep.pdf"), "rb") as handle:
             self.assertEqual(handle.read(), b"original bytes")
         self.assertTrue(os.path.exists(os.path.join(destination, "keep-2.pdf")))
+
+    def test_output_lands_beside_the_source_when_no_folder_is_chosen(self):
+        folder = tempfile.mkdtemp(dir=self.work)
+        source = make_pdf(folder, "beside.pdf", 4)
+        self.app.out_dir = None
+        self.run_inline("keep", [source], ("1-2", "kept.pdf"))
+        self.assertEqual(self.page_counts(folder), {"beside.pdf": 4, "kept.pdf": 2})
 
     def test_source_pdf_is_left_untouched(self):
         self.run_operation("count", (2, "batch"))
@@ -350,6 +365,14 @@ class ValidationTests(AppTestCase):
     def test_batch_size_must_be_positive(self):
         out = self.start("count", {"count": "0"}, paths=[self.source])
         self.assertRejected(out, "positive whole number")
+
+    def test_empty_batch_size_is_reported_in_plain_words(self):
+        out = self.start("count", {}, paths=[self.source])
+        self.assertRejected(out, "Pages per output file must be a whole number.")
+
+    def test_non_numeric_trim_input_is_reported_in_plain_words(self):
+        out = self.start("trim", {"start": "two"}, paths=[self.source])
+        self.assertRejected(out, "Pages to remove from the beginning must be a whole number.")
 
     def test_merge_needs_two_sources(self):
         out = self.start("merge", {}, paths=[self.source])

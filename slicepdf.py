@@ -384,6 +384,13 @@ class App(ctk.CTk):
     def form_value(self, key, default=""):
         return self.controls[key].get().strip() or default
 
+    def form_number(self, key, label, default=""):
+        """Return a whole number from a form field, refusing anything else in plain words."""
+        value = self.form_value(key, default)
+        if not value.isdigit():
+            raise ValueError(f"{label} must be a whole number.")
+        return int(value)
+
     def start_operation(self):
         if not self.pdf_paths:
             messagebox.showwarning("No file", "Choose a PDF first.")
@@ -395,10 +402,12 @@ class App(ctk.CTk):
                 payload = (self.form_value("pages"), self.form_value("filename"))
                 self._select_pages(self.mode, payload[0], self.total_pages)
             elif self.mode == "trim":
-                payload = (int(self.form_value("start", "0")), int(self.form_value("end", "0")), self.form_value("filename"))
+                payload = (self.form_number("start", "Pages to remove from the beginning", "0"),
+                           self.form_number("end", "Pages to remove from the end", "0"),
+                           self.form_value("filename"))
                 trim_pages(self.total_pages, payload[0], payload[1])
             elif self.mode == "count":
-                payload = (int(self.form_value("count")), self.form_value("filename"))
+                payload = (self.form_number("count", "Pages per output file"), self.form_value("filename"))
                 split_by_count(self.total_pages, payload[0])
             else:
                 if len(self.pdf_paths) < 2:
@@ -452,8 +461,9 @@ class App(ctk.CTk):
                     writer.write(output_file)
                 self.after(0, self._tick, index / len(outputs), filename)
             self.after(0, self._done, len(outputs), destination)
-        except (OSError, PdfReadError, ValueError) as error:
-            self.after(0, self._fail, str(error))
+        # Blind on purpose: an escaped exception would leave the run button disabled for good.
+        except Exception as error:  # noqa: BLE001
+            self.after(0, self._fail, str(error) or error.__class__.__name__)
 
     def set_message(self, text, color=MUTED):
         self.message.configure(text=text, text_color=color)
@@ -468,8 +478,9 @@ class App(ctk.CTk):
 
     def _done(self, count, directory):
         self._finish()
-        self.set_message(f"Done — {count} file{'' if count == 1 else 's'} saved.", SUCCESS)
-        if messagebox.askyesno("Finished", f"Created {count} files in:\n{directory}\n\nOpen the folder?"):
+        files = f"{count} file{'' if count == 1 else 's'}"
+        self.set_message(f"Done — {files} saved.", SUCCESS)
+        if messagebox.askyesno("Finished", f"Created {files} in:\n{directory}\n\nOpen the folder?"):
             os.startfile(directory)
 
     def _fail(self, message):

@@ -81,4 +81,4 @@ py -m unittest discover --pattern "test_*.py"
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Bundles the [Manrope](https://github.com/sharanda/manrope) typeface under the SIL Open Font License (`assets/fonts/OFL.txt`).
+MIT — see [LICENSE](LICENSE). Bundles the [Manrope](https://fonts.google.com/specimen/Manrope) typeface under the SIL Open Font License (`assets/fonts/OFL.txt`).
