@@ -5,6 +5,7 @@ import unittest
 from pdf_operations import (
     flatten_pages,
     parse_page_expression,
+    parse_page_order,
     safe_filename,
     split_by_count,
     trim_pages,
@@ -21,6 +22,23 @@ class PageOperationTests(unittest.TestCase):
             parse_page_expression("1, nope", 5)
         with self.assertRaises(ValueError):
             parse_page_expression("0-2", 5)
+
+    def test_parse_order_keeps_written_order(self):
+        self.assertEqual(parse_page_order("3, 1-2, 4", 4), [2, 0, 1, 3])
+
+    def test_parse_order_rejects_repeated_pages(self):
+        with self.assertRaises(ValueError):
+            parse_page_order("3, 1-3", 5)
+        with self.assertRaises(ValueError):
+            parse_page_order("2, 2", 5)
+
+    def test_parse_order_rejects_invalid_pages(self):
+        with self.assertRaises(ValueError):
+            parse_page_order("1, nope", 5)
+        with self.assertRaises(ValueError):
+            parse_page_order("", 5)
+        with self.assertRaises(ValueError):
+            parse_page_order("6", 5)
 
     def test_trim_pages(self):
         self.assertEqual(trim_pages(6, 1, 2), [1, 2, 3])

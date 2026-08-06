@@ -4,14 +4,13 @@ import re
 from collections.abc import Iterable
 
 
-def parse_page_expression(expression: str, total_pages: int) -> list[int]:
-    """Return unique zero-based page indexes from a 1-based expression."""
+def _expand_pages(expression: str, total_pages: int) -> Iterable[int]:
+    """Yield zero-based pages in written order, repeats included."""
     if total_pages < 1:
         raise ValueError("The PDF has no pages.")
     if not expression.strip():
         raise ValueError("Enter at least one page number or range.")
 
-    pages: list[int] = []
     for item in expression.split(","):
         item = item.strip()
         if not item:
@@ -23,9 +22,25 @@ def parse_page_expression(expression: str, total_pages: int) -> list[int]:
         end = int(parts[-1])
         if not (1 <= start <= end <= total_pages):
             raise ValueError(f"Pages must be between 1 and {total_pages}.")
-        for page in range(start - 1, end):
-            if page not in pages:
-                pages.append(page)
+        yield from range(start - 1, end)
+
+
+def parse_page_expression(expression: str, total_pages: int) -> list[int]:
+    """Return unique zero-based page indexes from a 1-based expression."""
+    pages: list[int] = []
+    for page in _expand_pages(expression, total_pages):
+        if page not in pages:
+            pages.append(page)
+    return pages
+
+
+def parse_page_order(expression: str, total_pages: int) -> list[int]:
+    """Return zero-based pages in the written order, rejecting repeated pages."""
+    pages: list[int] = []
+    for page in _expand_pages(expression, total_pages):
+        if page in pages:
+            raise ValueError(f"Page {page + 1} is listed more than once.")
+        pages.append(page)
     return pages
 
 
