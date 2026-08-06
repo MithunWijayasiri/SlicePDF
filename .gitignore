@@ -13,9 +13,3 @@ venv/
 build/
 dist/
 *.spec.bak
-
-# Local tooling
-.claude/
-
-# Private planning notes
-docs/plan.md
