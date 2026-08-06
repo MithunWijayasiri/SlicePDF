@@ -9,6 +9,7 @@ Windows desktop PDF utility for page-level operations: split by named ranges, de
 | `slicepdf.py` | CustomTkinter GUI (Document desk layout) + operation dispatch. |
 | `pdf_operations.py` | Pure page-math/filename helpers; no UI imports. |
 | `test_pdf_operations.py` | `unittest` suite for `pdf_operations`. |
+| `test_app.py` | GUI-level `unittest` suite: fonts, fields, drops, output, validation. Skips when Tk cannot open a window. |
 | `assets/fonts/` | Bundled Manrope statics (400/700/800) + `OFL.txt`. |
 | `SlicePDF.bat` | Double-click launcher → `pythonw slicepdf.py` (no console). |
 | `SlicePDF.spec` | PyInstaller config; source of truth for builds. |
@@ -23,17 +24,21 @@ Windows desktop PDF utility for page-level operations: split by named ranges, de
 
 ## Stack
 
-Python 3.14 · CustomTkinter · pypdf · PyInstaller.
+Python 3.14 · CustomTkinter · tkinterdnd2 · pypdf · PyInstaller.
 
 ## Run / build / check
 
 ```bash
 py slicepdf.py
+py -m unittest discover --verbose --pattern "test_*.py"
 py -m PyInstaller --clean --noconfirm SlicePDF.spec
-py -m ruff check slicepdf.py
+py -m ruff check slicepdf.py pdf_operations.py test_pdf_operations.py test_app.py
 ```
 
 Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
+
+`test_app.py` opens real (withdrawn) windows and runs the worker body inline — `after()` needs a
+mainloop that `unittest` does not provide, so live thread marshalling stays manually verified.
 
 ## Behavior
 

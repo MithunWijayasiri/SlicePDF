@@ -201,6 +201,7 @@ class App(ctk.CTk):
         self.file_button.grid(row=2, column=0, pady=(14, 20))
         for widget in (drop, headline, hint):
             widget.bind("<Button-1>", lambda _event: self.choose_file())
+        self.drop_zone = drop
         self._register_drop_zone(drop)
 
         # Small requested height so the action bar still fits at the 760x600 minimum.
