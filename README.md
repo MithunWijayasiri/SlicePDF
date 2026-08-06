@@ -61,7 +61,10 @@ Appendix.pdf
 
 ## Build the executable
 
+PyInstaller is a build tool, not a runtime dependency, so install it separately:
+
 ```bash
+py -m pip install pyinstaller
 py -m PyInstaller --clean --noconfirm SlicePDF.spec
 ```
 

@@ -387,6 +387,16 @@ class ValidationTests(AppTestCase):
         self.app.start_operation()
         self.assertRejected(self.app.out_dir, "output name is empty")
 
+    def test_named_range_ending_before_it_starts_is_rejected(self):
+        self.app.change_operation("named")
+        self.load(self.source)
+        self.app.rows[0].name_entry.insert(0, "Intro")
+        self.app.rows[0].from_entry.insert(0, "5")
+        self.app.rows[0].to_entry.insert(0, "2")
+        self.app.out_dir = tempfile.mkdtemp(dir=self.work)
+        self.app.start_operation()
+        self.assertRejected(self.app.out_dir, "From cannot come after To")
+
     def test_at_least_one_named_range_is_required(self):
         out = self.start("named", {}, paths=[self.source])
         self.assertRejected(out, "at least one named range")

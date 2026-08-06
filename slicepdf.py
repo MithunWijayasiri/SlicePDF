@@ -48,7 +48,7 @@ OPERATIONS = {
     "Merge PDFs": "merge",
 }
 DESCRIPTIONS = {
-    "named": "Divide a PDF into named files using inclusive page ranges.",
+    "named": "Divide a PDF into named files. Each range includes its first and last page.",
     "delete": "Remove selected pages and keep everything else.",
     "trim": "Remove pages from the beginning, the end, or both.",
     "count": "Create evenly sized batches from one PDF.",
@@ -375,7 +375,7 @@ class App(ctk.CTk):
             except ValueError as error:
                 raise ValueError(f"'{name}': From/To must be whole numbers.") from error
             if not (1 <= start <= end <= self.total_pages):
-                raise ValueError(f"'{name}': pages must be between 1 and {self.total_pages}, with From ≤ To.")
+                raise ValueError(f"'{name}': pages must be between 1 and {self.total_pages}, and From cannot come after To.")
             ranges.append((name, start, end))
         if not ranges:
             raise ValueError("Add at least one named range.")
