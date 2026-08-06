@@ -1,58 +1,54 @@
 # SlicePDF
 
-Windows desktop PDF page utility. Current feature: split one PDF into named files using inclusive page ranges. Target user is non-technical — GUI over CLI, minimal friction.
+Windows desktop PDF utility. Current feature: split one PDF into named files by inclusive page ranges. Target user is non-technical → GUI over CLI, minimal friction.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `slicepdf.py` | Single-file CustomTkinter GUI and split workflow. |
+| `slicepdf.py` | Single-file CustomTkinter GUI + split workflow. |
 | `SlicePDF.bat` | Double-click launcher → `pythonw slicepdf.py` (no console). |
+| `SlicePDF.spec` | PyInstaller config; source of truth for builds. |
+| `requirements.txt` | Runtime deps: `customtkinter`, `pypdf`. |
+| `.github/workflows/build.yml` | CI on push + PR: compile, Ruff, PyInstaller build, `SlicePDF.exe` artifact. |
 | `README.md` | Public project and user instructions. |
-| `dist/SlicePDF.exe` | Existing portable binary; rebuild after source changes. |
-| `SlicePDF.spec` | PyInstaller configuration. |
-| `build/` | PyInstaller build artifacts; do not publish as source. |
-| `docs/plan.md` | Private product roadmap and GitHub workflow; excluded from Git. |
+| `docs/plan.md` | Private roadmap; gitignored. |
+
+`build/`, `dist/`, `*.pdf`, `.claude/` are gitignored.
 
 ## Stack
 
-- Python 3.14.
-- CustomTkinter for GUI.
-- `pypdf` for PDF read/write.
-- PyInstaller for Windows executable builds.
+Python 3.14 · CustomTkinter · pypdf · PyInstaller.
 
-## Run / build
+## Run / build / check
 
 ```bash
 py slicepdf.py
-py -m PyInstaller --onefile --windowed --name "SlicePDF" slicepdf.py
+py -m PyInstaller --clean --noconfirm SlicePDF.spec
+py -m ruff check slicepdf.py
 ```
 
-Rebuild the executable after changes to `slicepdf.py`; the executable is a frozen snapshot.
+Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
 
-## Current behavior
+## Behavior
 
-- Select a PDF; page count appears in the window.
-- Add one or more named page ranges.
-- Page numbers are 1-based and inclusive.
-- Blank rows are ignored.
-- Each valid range becomes a separate PDF.
-- Output defaults to the source PDF folder; a different folder can be selected.
-- Output names use `<source>-split-<chapter-name>.pdf`.
-- Duplicate chapter names receive numeric suffixes.
-- Empty names fall back to `chapter-N`.
-- Invalid ranges, missing names, unreadable PDFs, and missing input files show errors.
-- PDF work runs on a background thread; UI updates use `after()`.
+- Page numbers 1-based and inclusive; validated as `1 <= from <= to <= total`.
+- Blank rows ignored; at least one named range required.
+- Output name `<source>-split-<slug>.pdf`; duplicate slugs get numeric suffix; name with no alphanumerics → `chapter-N`.
+- Output folder defaults to the source PDF folder; a different folder can be selected.
+- Errors surface via `messagebox`: unreadable PDF, no file chosen, non-numeric or out-of-range pages, empty name, no chapters.
+- Split runs on a daemon thread; UI updates marshalled through `self.after()`.
 
-## Engineering rules
+## Rules
 
-- Keep the app dependency-light and single-file until a second operation justifies extraction.
-- Keep user-facing text plain and non-technical.
-- Keep long-running PDF operations off the UI thread.
+- Dependency-light and single-file until a second operation justifies extraction.
+- User-facing text plain and non-technical.
+- Long-running PDF work off the UI thread.
+- No machine-specific paths in `SlicePDF.spec`.
 - Add tests before extracting shared page-operation logic.
-- Avoid machine-specific paths in public build configuration.
-- Unsigned Windows executables may trigger SmartScreen; signing is out of scope.
+- Unsigned executable triggers SmartScreen; signing out of scope.
+- Releases are manual; CI never creates them.
 
-## Planned features
+## Planned
 
-Priorities: custom output names, delete selected pages, trim start/end, split by page count, keep/reorder pages, and merge PDFs.
+Custom output names · delete selected pages · trim start/end · split by page count · keep/reorder pages · merge PDFs.
