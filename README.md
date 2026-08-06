@@ -4,20 +4,22 @@
 ![Python](https://img.shields.io/badge/python-3.14-3776AB)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A simple Windows desktop tool for dividing PDFs into smaller, named files by page range.
+A simple Windows desktop tool for common PDF page operations.
 
 SlicePDF processes files locally. It does not upload documents or use telemetry.
 
 ## Current features
 
-- Choose a PDF and view its page count.
-- Add multiple named page ranges.
-- Use 1-based inclusive page numbers.
+- Split one PDF into named files by inclusive page ranges.
+- Create custom output filenames.
+- Delete or keep selected pages using expressions such as `2, 5-7, 12`.
+- Trim pages from the beginning and/or end.
+- Split a PDF into evenly sized page batches.
+- Reorder selected pages using a page expression.
+- Merge two or more PDFs in selection order.
 - Choose an output folder, or save beside the original PDF.
 - Process large PDFs without freezing the window.
 - Receive clear errors for invalid ranges and unreadable files.
-
-The current release focuses on splitting PDFs by named page ranges. Other page operations listed in the roadmap are not available yet.
 
 ## Use the app
 
@@ -29,11 +31,9 @@ When using a released executable:
 
 1. Download and open `SlicePDF.exe`.
 2. If Windows shows a SmartScreen warning, select **More info** → **Run anyway**.
-3. Click **Choose PDF…**.
-4. Add a chapter for each output file.
-5. Enter a name and the first and last page for each range.
-6. Optionally choose an output folder.
-7. Click **Split**.
+3. Select an operation and enter the requested page details or output names.
+4. Optionally choose an output folder.
+5. Click **Run**.
 
 Example:
 
@@ -84,7 +84,7 @@ The executable is created in `dist/`.
 
 ## Roadmap
 
-Planned page operations include custom output names, deleting selected pages, trimming pages from the beginning or end, splitting by page count, keeping selected pages, reordering pages, and merging PDFs.
+Planned usability and safety improvements include previews, remembered output folders, drag and drop, batch processing, cancellation, output-folder shortcuts, accessibility improvements, metadata preservation, and safer temporary output handling.
 
 ## Contributing
 
