@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SlicePDF — everyday PDF page edits, on your own computer</title>
+<meta name="description" content="A small Windows app for splitting, trimming, reordering and merging PDF pages. No uploads, no tracking, no overwritten files.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SlicePDF — everyday PDF page edits, on your own computer">
+<meta property="og:description" content="Split by named ranges, delete or keep pages, trim, reorder, merge. Windows, MIT licensed.">
+<meta property="og:url" content="https://mithunwijayasiri.github.io/SlicePDF/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23E6E8E3'/><rect x='7' y='4' width='18' height='24' fill='%232233C9'/><path d='M4 12h24M4 21h24' stroke='%23FF2E63' stroke-width='2.5'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400..900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --stone:#e6e8e3; --rule:#d3d7cf; --sheet:#fbfbf9;
+  --ink:#15181b; --muted:#5f666b;
+  --blue:#2233c9; --pink:#ff2e63;
+  --sans:'Schibsted Grotesk','Segoe UI',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--stone); color:var(--ink);
+  font:400 17.5px/1.62 var(--sans);
+  overflow-x:hidden;
+}
+h1,h2,h3{margin:0; font-weight:800; letter-spacing:-.025em; line-height:1.05}
+a{color:var(--blue); text-decoration-thickness:1px; text-underline-offset:3px}
+a:hover{color:var(--pink)}
+:focus-visible{outline:2.5px solid var(--pink); outline-offset:3px}
+.wrap{width:min(1000px,calc(100% - 44px)); margin-inline:auto}
+
+/* ---------- left ruler: this page, measured in pages ---------- */
+.ruler{position:fixed; inset:0 auto 0 0; width:64px; display:none; z-index:5; pointer-events:none}
+.ruler .scale{position:absolute; inset:12vh 0 12vh auto; right:0; width:100%}
+.ruler .tick{position:absolute; right:0; height:1px; width:9px; background:var(--rule)}
+.ruler .tick.major{width:20px; background:#b9bfb6}
+.ruler .num{position:absolute; right:26px; transform:translateY(-50%); font-family:var(--mono); font-size:10px; color:#98a09a}
+.ruler .cursor{position:absolute; right:0; width:34px; height:2px; background:var(--pink)}
+.ruler .cursor b{position:absolute; right:0; top:6px; font-family:var(--mono); font-size:10px; font-weight:500; color:var(--pink); white-space:nowrap}
+@media (min-width:1180px){ .ruler{display:block} }
+
+/* ---------- masthead ---------- */
+.masthead{display:flex; flex-wrap:wrap; gap:14px 26px; align-items:baseline; padding:26px 0 0}
+.wordmark{font-weight:800; font-size:20px; letter-spacing:-.035em}
+.masthead .meta{margin-left:auto; display:flex; gap:20px; flex-wrap:wrap}
+.masthead .meta span{font-family:var(--mono); font-size:12px; color:var(--muted)}
+
+/* ---------- hero ---------- */
+.hero{padding:clamp(48px,9vh,104px) 0 0}
+.hero h1{font-size:clamp(40px,7.2vw,84px); max-width:17em}
+.hero h1 em{font-style:normal; color:var(--blue)}
+.hero .lede{max-width:47ch; margin:28px 0 0; color:#3b4145; font-size:clamp(17.5px,2vw,20px)}
+
+/* ---------- the slicer ---------- */
+.slicer{margin:clamp(34px,6vh,58px) 0 0; padding:26px 26px 8px; background:var(--sheet); border:1px solid var(--rule)}
+.slicer .head{display:flex; flex-wrap:wrap; gap:8px 20px; align-items:baseline; justify-content:space-between; margin-bottom:26px}
+.slicer .doc{margin:0; font-family:var(--mono); font-size:13px}
+.slicer .doc b{font-weight:500}
+.hint{margin:0; font-family:var(--mono); font-size:12px; color:var(--muted)}
+.no-js .hint{display:none}
+
+.strip{position:relative; height:104px; touch-action:none; user-select:none}
+.ticks{position:absolute; inset:0 0 26px 0; display:flex; gap:1px}
+.ticks i{flex:1; background:#dfe2dc; transform-origin:bottom}
+.band{position:absolute; top:0; bottom:26px; background:var(--blue); mix-blend-mode:multiply}
+.band:nth-of-type(1){opacity:1} .band:nth-of-type(2){opacity:.58} .band:nth-of-type(3){opacity:.32}
+.cut{position:absolute; top:-9px; bottom:17px; width:2px; margin-left:-1px; padding:0; border:0; background:var(--pink); cursor:ew-resize; z-index:3}
+.cut::after{content:""; position:absolute; left:-10px; right:-10px; top:0; bottom:0}
+.cut b{position:absolute; top:-1px; left:50%; transform:translateX(-50%); width:13px; height:13px; background:var(--pink); border-radius:50%; transition:transform .15s}
+.cut span{position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); padding:0 5px; background:var(--sheet); font-family:var(--mono); font-size:11px; font-weight:500; color:var(--pink); white-space:nowrap}
+.cut:hover b,.cut:focus-visible b{transform:translateX(-50%) scale(1.4)}
+.scalebar{position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; color:#98a09a}
+
+.rows{list-style:none; margin:26px 0 0; padding:0; border-top:1px solid var(--rule)}
+.rows li{display:grid; grid-template-columns:12px minmax(130px,1fr) 96px 82px 1.05fr; align-items:center; gap:16px; padding:14px 0; border-bottom:1px solid var(--rule)}
+.rows .swatch{width:10px; height:10px; background:var(--blue)}
+.rows li:nth-child(2) .swatch{opacity:.58}
+.rows li:nth-child(3) .swatch{opacity:.32}
+.rows input{width:100%; padding:5px 8px; margin-left:-8px; border:1px solid transparent; background:transparent; color:var(--ink);
+  font:600 16px/1.3 var(--sans)}
+.rows input:hover{border-color:var(--rule); background:#fff}
+.rows input:focus{border-color:var(--blue); background:#fff; outline:0}
+.rows .pp,.rows .ct{font-family:var(--mono); font-size:12px; color:var(--muted)}
+.rows .out{font-family:var(--mono); font-size:13px; font-weight:500; overflow-wrap:anywhere}
+.rows .out i{font-style:normal; font-weight:400; color:var(--blue); margin-right:9px}
+.slicer .foot{padding:18px 0 20px; margin:0; max-width:78ch; font-family:var(--mono); font-size:12px; line-height:1.95; color:var(--muted)}
+.slicer .foot b{color:var(--ink); font-weight:500}
+
+/* ---------- calls to action ---------- */
+.cta{display:flex; flex-wrap:wrap; align-items:center; gap:16px 28px; margin:32px 0 0}
+.btn{display:inline-flex; align-items:baseline; gap:12px; padding:17px 26px; background:var(--pink); color:var(--ink); text-decoration:none;
+  font:800 19px/1 var(--sans); letter-spacing:-.025em}
+.btn small{font-family:var(--mono); font-size:12px; font-weight:400; letter-spacing:0}
+.btn:hover{color:var(--ink); background:#ff1550}
+.cta p{margin:0; max-width:34ch; font-family:var(--mono); font-size:12px; line-height:1.85; color:var(--muted)}
+
+/* ---------- sections ---------- */
+section{padding:clamp(64px,11vh,124px) 0 0}
+.sec-head{display:flex; flex-wrap:wrap; gap:10px 24px; align-items:baseline; padding-bottom:10px; border-bottom:2px solid var(--ink)}
+.sec-head h2{font-size:clamp(27px,3.6vw,40px)}
+.sec-head p{margin:0 0 0 auto; max-width:36ch; color:var(--muted); font-size:15px}
+
+.ops{list-style:none; margin:0; padding:0}
+.ops li{display:grid; grid-template-columns:1.3fr .95fr 1.05fr; gap:14px 30px; padding:24px 0; border-bottom:1px solid var(--rule)}
+.ops h3{font-size:20px}
+.ops p{margin:8px 0 0; max-width:33ch; color:var(--muted); font-size:15px}
+.ops .k{display:block; margin-bottom:9px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#98a09a}
+.ops code{display:inline-block; padding:4px 7px; border:1px solid var(--rule); background:var(--sheet); font-family:var(--mono); font-size:13px}
+.ops .yield{margin:0; max-width:none; font-family:var(--mono); font-size:13px; line-height:1.95; color:var(--ink)}
+.ops .yield em{font-style:normal; color:var(--blue)}
+
+.promise{display:grid; grid-template-columns:repeat(auto-fit,minmax(258px,1fr)); gap:0 36px}
+.promise div{padding:26px 0; border-bottom:1px solid var(--rule)}
+.promise h3{font-size:17.5px}
+.promise p{margin:10px 0 0; color:var(--muted); font-size:15px}
+.promise code{font-family:var(--mono); font-size:13px; color:var(--ink)}
+
+.install{display:grid; grid-template-columns:1fr 1fr; gap:46px; margin-top:36px}
+.install h3{font-size:21px}
+.install ol{margin:18px 0 0; padding-left:1.4em}
+.install li{margin:0 0 12px; font-size:16px}
+.install li::marker{font-family:var(--mono); font-size:13px; color:var(--muted)}
+.install .note{margin:16px 0 0; color:var(--muted); font-size:16px}
+pre{margin:18px 0 0; padding:18px 20px; background:var(--ink); color:#e8eae5; overflow-x:auto;
+  font-family:var(--mono); font-size:13px; line-height:1.95}
+pre span{color:#8f9aa6}
+.checksum{margin:18px 0 0; font-family:var(--mono); font-size:12px; line-height:1.95; color:var(--muted); overflow-wrap:anywhere}
+
+.notyet{display:flex; flex-wrap:wrap; gap:10px; margin-top:30px}
+.notyet span{padding:9px 13px; border:1px dashed #b9bfb6; font-family:var(--mono); font-size:13px; color:var(--muted)}
+.limits{margin:28px 0 0; max-width:66ch; color:var(--muted); font-size:16px}
+
+footer{display:flex; flex-wrap:wrap; gap:14px 34px; align-items:baseline;
+  margin-top:clamp(72px,12vh,132px); padding:32px 0 48px; border-top:2px solid var(--ink)}
+footer p{margin:0; font-family:var(--mono); font-size:12px; line-height:1.95; color:var(--muted)}
+footer nav{margin-left:auto; display:flex; gap:24px; flex-wrap:wrap}
+footer nav a{font-family:var(--mono); font-size:12px}
+
+@media (max-width:860px){
+  .ops li{grid-template-columns:1fr}
+  .install{grid-template-columns:1fr; gap:40px}
+  .rows li{grid-template-columns:12px 1fr; gap:6px 16px}
+  .rows .pp,.rows .ct,.rows .out{grid-column:2}
+  .sec-head p{margin-left:0}
+}
+@media (max-width:560px){
+  .slicer{padding:20px 16px 4px}
+  .strip{height:88px}
+  .btn{width:100%; justify-content:space-between}
+}
+
+@media (prefers-reduced-motion: no-preference){
+  .ticks i{animation:grow .5s cubic-bezier(.2,.8,.2,1) both}
+  .band{animation:ink .6s .5s ease-out both}
+  .cut{animation:drop .45s .78s cubic-bezier(.2,.9,.2,1) both}
+  .rows li{animation:rise .5s ease-out both; animation-delay:calc(.9s + var(--i) * .09s)}
+  .ruler .cursor{transition:top .1s linear}
+  @keyframes grow{from{transform:scaleY(.1); opacity:0}}
+  @keyframes ink{from{opacity:0}}
+  @keyframes drop{from{transform:translateY(-16px); opacity:0}}
+  @keyframes rise{from{transform:translateY(9px); opacity:0}}
+}
+</style>
+</head>
+<body class="no-js">
+
+<div class="ruler" aria-hidden="true"><div class="scale" id="scale"></div></div>
+
+<div class="wrap">
+  <header class="masthead">
+    <span class="wordmark">SlicePDF</span>
+    <div class="meta"><span>Windows</span><span>MIT</span><span>Portable</span></div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1>Everyday PDF page edits. <em>Nothing leaves your computer.</em></h1>
+      <p class="lede">A small Windows app for splitting, trimming, reordering and merging PDF pages. Below is its named-range split, running on a 95-page document — move the cut lines and watch the filenames change.</p>
+    </div>
+
+    <div class="slicer">
+      <div class="head">
+        <p class="doc"><b>report.pdf</b> · 95 pages · opened read-only</p>
+        <p class="hint">Drag a cut line, or focus one and press ← →. Rename any range.</p>
+      </div>
+
+      <div class="strip" id="strip">
+        <div class="ticks" id="ticks" aria-hidden="true"></div>
+        <div class="band" style="left:0%;width:10.526%"></div>
+        <div class="band" style="left:10.526%;width:73.684%"></div>
+        <div class="band" style="left:84.211%;width:15.789%"></div>
+        <button class="cut" id="cut0" style="left:10.526%" role="slider" aria-label="First cut" aria-valuemin="1" aria-valuemax="79" aria-valuenow="10" aria-valuetext="after page 10"><b></b><span>cut · 10</span></button>
+        <button class="cut" id="cut1" style="left:84.211%" role="slider" aria-label="Second cut" aria-valuemin="11" aria-valuemax="94" aria-valuenow="80" aria-valuetext="after page 80"><b></b><span>cut · 80</span></button>
+        <div class="scalebar" aria-hidden="true"><span>1</span><span>95</span></div>
+      </div>
+
+      <ul class="rows" id="rows">
+        <li style="--i:0"><span class="swatch" aria-hidden="true"></span>
+          <input value="Introduction" aria-label="Name for the first range" spellcheck="false" maxlength="48">
+          <span class="pp">pp. 1–10</span><span class="ct">10 pages</span>
+          <span class="out"><i>saves as</i>Introduction.pdf</span></li>
+        <li style="--i:1"><span class="swatch" aria-hidden="true"></span>
+          <input value="Main content" aria-label="Name for the second range" spellcheck="false" maxlength="48">
+          <span class="pp">pp. 11–80</span><span class="ct">70 pages</span>
+          <span class="out"><i>saves as</i>Main content.pdf</span></li>
+        <li style="--i:2"><span class="swatch" aria-hidden="true"></span>
+          <input value="Appendix" aria-label="Name for the third range" spellcheck="false" maxlength="48">
+          <span class="pp">pp. 81–95</span><span class="ct">15 pages</span>
+          <span class="out"><i>saves as</i>Appendix.pdf</span></li>
+      </ul>
+      <p class="foot">Filenames here follow the app's own rules: characters Windows forbids become <b>-</b>, and a name already taken picks up a number. Try typing <b>Re/port</b>, or giving two ranges the same name.</p>
+    </div>
+
+    <div class="cta">
+      <a class="btn" href="https://github.com/MithunWijayasiri/SlicePDF/releases/latest/download/SlicePDF.exe">Download SlicePDF.exe <small>latest release</small></a>
+      <p>Windows · unsigned, so SmartScreen asks once. Or <a href="#install">run it from source</a>.</p>
+    </div>
+
+    <section id="operations">
+      <div class="sec-head">
+        <h2>Seven operations</h2>
+        <p>The app's sidebar, in its own order. Every example runs on the same 95-page document.</p>
+      </div>
+      <ul class="ops">
+        <li>
+          <div><h3>Split by named ranges</h3><p>Divide a PDF into named files. Each range includes its first and last page.</p></div>
+          <div><span class="k">You enter</span><code>Introduction · 1 · 10</code></div>
+          <div><span class="k">You get</span><p class="yield"><em>→</em> Introduction.pdf<br><em>→</em> Main content.pdf<br><em>→</em> Appendix.pdf</p></div>
+        </li>
+        <li>
+          <div><h3>Delete selected pages</h3><p>Remove selected pages and keep everything else.</p></div>
+          <div><span class="k">You enter</span><code>2, 5-7, 12</code></div>
+          <div><span class="k">You get</span><p class="yield"><em>→</em> one file, 90 pages</p></div>
+        </li>
+        <li>
+          <div><h3>Keep selected pages</h3><p>Create a PDF containing only the pages you select.</p></div>
+          <div><span class="k">You enter</span><code>2, 5-7, 12</code></div>
+          <div><span class="k">You get</span><p class="yield"><em>→</em> one file, 5 pages</p></div>
+        </li>
+        <li>
+          <div><h3>Trim start/end</h3><p>Remove pages from the beginning, the end, or both.</p></div>
+          <div><span class="k">You enter</span><code>start 2 · end 3</code></div>
+          <div><span class="k">You get</span><p class="yield"><em>→</em> one file, pp. 3–92</p></div>
+        </li>
+        <li>
+          <div><h3>Split by page count</h3><p>Create evenly sized batches from one PDF.</p></div>
+          <div><span class="k">You enter</span><code>25</code></div>
+          <div><span class="k">You get</span><p class="yield"><em>→</em> four files: 25, 25, 25, 20</p></div>
+        </li>
+        <li>
+          <div><h3>Reorder pages</h3><p>Arrange selected pages in the order you enter. A page listed twice is refused, so nothing is dropped quietly.</p></div>
+          <div><span class="k">You enter</span><code>3, 1-2, 4</code></div>
+          <div><span class="k">You get</span><p class="yield"><em>→</em> one file: 3, 1, 2, 4</p></div>
+        </li>
+        <li>
+          <div><h3>Merge PDFs</h3><p>Combine two or more PDFs in the order you choose.</p></div>
+          <div><span class="k">You enter</span><code>report.pdf + appendix.pdf</code></div>
+          <div><span class="k">You get</span><p class="yield"><em>→</em> one file, in that order</p></div>
+        </li>
+      </ul>
+    </section>
+
+    <section id="promises">
+      <div class="sec-head">
+        <h2>What it will not do</h2>
+        <p>The limits are the point. Each of these is enforced in code, not promised in a policy.</p>
+      </div>
+      <div class="promise">
+        <div><h3>Will not upload anything</h3><p>No account, no server, no network calls, no telemetry. The whole app runs on your machine.</p></div>
+        <div><h3>Will not touch your original</h3><p>The source PDF is only ever read. It comes out of the operation byte for byte the same.</p></div>
+        <div><h3>Will not overwrite a file</h3><p>A name already in the folder becomes <code>Appendix-2.pdf</code>. New files are created exclusively, so a collision fails instead of replacing.</p></div>
+        <div><h3>Will not guess your page numbers</h3><p>Page numbers are 1-based and inclusive, and <code>1 &lt;= from &lt;= to &lt;= total</code> is checked before anything is written.</p></div>
+        <div><h3>Will not freeze on a long job</h3><p>Page work happens off the interface thread, with a progress bar while it runs.</p></div>
+        <div><h3>Will not talk to you in code</h3><p>Messages are plain language. There is no command line, no config file, and nothing to set up.</p></div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="sec-head">
+        <h2>Install</h2>
+        <p>One executable, or two lines of Python. Both give you the same app.</p>
+      </div>
+      <div class="install">
+        <div>
+          <h3>The executable</h3>
+          <ol>
+            <li>Download <a href="https://github.com/MithunWijayasiri/SlicePDF/releases/latest/download/SlicePDF.exe">SlicePDF.exe</a>. One file, nothing to install.</li>
+            <li>Windows shows a SmartScreen warning, because the file is not code-signed. Choose <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+            <li>Drag a PDF onto the window, or use <strong>Choose PDF</strong>.</li>
+          </ol>
+          <p class="checksum">Check it first, if you like:<br>Get-FileHash .\SlicePDF.exe -Algorithm SHA256<br>then compare it with SlicePDF.exe.sha256 on the <a href="https://github.com/MithunWijayasiri/SlicePDF/releases/latest">latest release</a>.</p>
+        </div>
+        <div>
+          <h3>From source</h3>
+          <p class="note">Needs Python 3.14 on Windows.</p>
+<pre><span># clone the repository, then:</span>
+py -m pip install -r requirements.txt
+py slicepdf.py</pre>
+          <p class="checksum">CustomTkinter · tkinterdnd2 · pypdf<br>Tests: py -m unittest discover --pattern "test_*.py"</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="notyet">
+      <div class="sec-head">
+        <h2>Not yet</h2>
+        <p>The gaps, stated plainly, roughly in the order they are likely to land.</p>
+      </div>
+      <div class="notyet">
+        <span>page previews</span><span>remembered output folders</span><span>batch processing</span><span>cancel a running job</span>
+      </div>
+      <p class="limits">Windows only — it uses Windows font loading and Windows filename rules directly. The build is unsigned, and signing is out of scope. Light interface only. If one of these blocks you, open an issue and say so.</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>SlicePDF · MIT licensed<br>The app bundles the Manrope typeface under the SIL Open Font License.</p>
+    <nav>
+      <a href="https://github.com/MithunWijayasiri/SlicePDF">Repository</a>
+      <a href="https://github.com/MithunWijayasiri/SlicePDF/issues">Report an issue</a>
+      <a href="https://github.com/MithunWijayasiri/SlicePDF/releases">All releases</a>
+    </nav>
+  </footer>
+</div>
+
+<script>
+document.body.classList.remove('no-js');
+const TOTAL = 95;
+
+/* this page, measured in pages */
+(function ruler(){
+  const scale = document.getElementById('scale');
+  let marks = '';
+  for (let page = 5; page <= TOTAL; page += 5) {
+    const top = ((page - 1) / (TOTAL - 1)) * 100;
+    const major = page % 20 === 0 || page === TOTAL;
+    marks += '<div class="tick' + (major ? ' major' : '') + '" style="top:' + top + '%"></div>';
+    if (major) marks += '<div class="num" style="top:' + top + '%">' + page + '</div>';
+  }
+  scale.innerHTML = marks + '<div class="cursor" id="cursor"><b>p. 1</b></div>';
+
+  const cursor = document.getElementById('cursor');
+  const label = cursor.querySelector('b');
+  let queued = false;
+  function place(){
+    queued = false;
+    const travel = document.documentElement.scrollHeight - innerHeight;
+    const through = travel > 0 ? Math.min(1, Math.max(0, scrollY / travel)) : 0;
+    cursor.style.top = (through * 100) + '%';
+    label.textContent = 'p. ' + Math.max(1, Math.round(through * TOTAL));
+  }
+  addEventListener('scroll', function(){
+    if (!queued) { queued = true; requestAnimationFrame(place); }
+  }, {passive:true});
+  place();
+})();
+
+/* the slicer */
+(function slicer(){
+  const strip = document.getElementById('strip');
+  const rows = Array.from(document.querySelectorAll('#rows li'));
+  const bands = Array.from(document.querySelectorAll('.band'));
+  const cuts = [document.getElementById('cut0'), document.getElementById('cut1')];
+  const at = [10, 80];
+
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.getElementById('ticks').innerHTML = Array.from({length: TOTAL}, function(_, i){
+    return '<i style="animation-delay:' + (still ? 0 : i * 6) + 'ms"></i>';
+  }).join('');
+
+  const FORBIDDEN = /[<>:"/\\|?*\x00-\x1f]/g;
+
+  // mirrors safe_filename() in pdf_operations.py
+  function safeName(raw){
+    const base = raw.trim().replace(/^.*[\\/]/, '');
+    const dot = base.lastIndexOf('.');
+    let stem = dot > 0 ? base.slice(0, dot) : base;
+    let extension = dot > 0 ? base.slice(dot) : '';
+    stem = stem.replace(FORBIDDEN, '-').replace(/^[\s.]+|[\s.]+$/g, '');
+    extension = extension.replace(FORBIDDEN, '-').trim();
+    if (!stem) stem = 'output';
+    if (!extension) extension = '.pdf';
+    else if (extension.toLowerCase() !== '.pdf') extension += '.pdf';
+    return stem + extension;
+  }
+
+  // mirrors unique_filename() in pdf_operations.py
+  function uniquify(names){
+    const used = new Set();
+    return names.map(function(name){
+      const dot = name.lastIndexOf('.');
+      const stem = name.slice(0, dot);
+      const extension = name.slice(dot);
+      let candidate = name;
+      let count = 1;
+      while (used.has(candidate.toLowerCase())) {
+        count++;
+        candidate = stem + '-' + count + extension;
+      }
+      used.add(candidate.toLowerCase());
+      return candidate;
+    });
+  }
+
+  const escapeText = text => text.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+  function draw(){
+    const ranges = [[1, at[0]], [at[0] + 1, at[1]], [at[1] + 1, TOTAL]];
+    const files = uniquify(rows.map(row => safeName(row.querySelector('input').value)));
+
+    ranges.forEach(function(range, i){
+      const from = range[0], to = range[1];
+      bands[i].style.left = ((from - 1) / TOTAL * 100) + '%';
+      bands[i].style.width = ((to - from + 1) / TOTAL * 100) + '%';
+      rows[i].querySelector('.pp').textContent = 'pp. ' + from + '–' + to;
+      rows[i].querySelector('.ct').textContent = (to - from + 1) + (to > from ? ' pages' : ' page');
+      rows[i].querySelector('.out').innerHTML = '<i>saves as</i>' + escapeText(files[i]);
+    });
+
+    at.forEach(function(page, i){
+      cuts[i].style.left = (page / TOTAL * 100) + '%';
+      cuts[i].querySelector('span').textContent = 'cut · ' + page;
+      cuts[i].setAttribute('aria-valuenow', page);
+      cuts[i].setAttribute('aria-valuetext', 'after page ' + page);
+    });
+    cuts[0].setAttribute('aria-valuemax', at[1] - 1);
+    cuts[1].setAttribute('aria-valuemin', at[0] + 1);
+  }
+
+  function move(i, page){
+    const lowest = i === 0 ? 1 : at[0] + 1;
+    const highest = i === 0 ? at[1] - 1 : TOTAL - 1;
+    at[i] = Math.min(highest, Math.max(lowest, page));
+    draw();
+  }
+
+  function pageUnder(x){
+    const box = strip.getBoundingClientRect();
+    return Math.round(((x - box.left) / box.width) * TOTAL);
+  }
+
+  cuts.forEach(function(cut, i){
+    cut.addEventListener('pointerdown', function(event){
+      event.preventDefault();
+      cut.setPointerCapture(event.pointerId);
+      cut.focus();
+      function drag(e){ move(i, pageUnder(e.clientX)); }
+      function stop(){
+        cut.removeEventListener('pointermove', drag);
+        cut.removeEventListener('pointerup', stop);
+        cut.removeEventListener('pointercancel', stop);
+      }
+      cut.addEventListener('pointermove', drag);
+      cut.addEventListener('pointerup', stop);
+      cut.addEventListener('pointercancel', stop);
+    });
+    cut.addEventListener('keydown', function(event){
+      const step = {ArrowLeft:-1, ArrowDown:-1, ArrowRight:1, ArrowUp:1, PageDown:-5, PageUp:5}[event.key];
+      if (!step) return;
+      event.preventDefault();
+      move(i, at[i] + step);
+    });
+  });
+
+  rows.forEach(row => row.querySelector('input').addEventListener('input', draw));
+  draw();
+})();
+</script>
+</body>
+</html>
