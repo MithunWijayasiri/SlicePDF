@@ -1,0 +1,113 @@
+name: Release
+
+# Manually-triggered release. Stamps the version into the source, runs the same
+# checks as the build workflow, then tags the commit and publishes a GitHub
+# Release with the executable, its checksum, and auto-generated notes.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, e.g. 0.1.0 (a leading "v" is stripped)'
+        required: true
+        type: string
+      release_branch:
+        description: 'Branch to release from'
+        required: true
+        default: 'main'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_branch }}
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$version' is not a version like 0.1.0 or 0.1.0-rc.1"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+            echo "::error::Tag v$version already exists"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Apply release version
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          sed -i -E "s/^__version__ = \".*\"/__version__ = \"$VERSION\"/" slicepdf.py
+          grep -qx "__version__ = \"$VERSION\"" slicepdf.py
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+
+      - name: Compile source
+        run: python -m py_compile slicepdf.py pdf_operations.py
+
+      - name: Run tests
+        run: python -m unittest discover --verbose --pattern "test_*.py"
+
+      - name: Check code quality
+        run: |
+          python -m pip install ruff
+          ruff check slicepdf.py pdf_operations.py test_pdf_operations.py test_app.py
+
+      - name: Build executable
+        run: python -m PyInstaller --clean --noconfirm SlicePDF.spec
+
+      - name: Checksum executable
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist/SlicePDF.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  SlicePDF.exe" | Out-File dist/SlicePDF.exe.sha256 -Encoding ascii -NoNewline
+
+      - name: Commit version bump and tag
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          BRANCH: ${{ inputs.release_branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add slicepdf.py
+          git commit -m "chore(release): v$VERSION" || echo "Version already set; nothing to commit"
+          git tag "v$VERSION"
+          git push origin "HEAD:$BRANCH"
+          git push origin "v$VERSION"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: "v${{ steps.ver.outputs.version }}"
+          name: "SlicePDF v${{ steps.ver.outputs.version }}"
+          generate_release_notes: true
+          prerelease: ${{ contains(steps.ver.outputs.version, '-') }}
+          files: |
+            dist/SlicePDF.exe
+            dist/SlicePDF.exe.sha256

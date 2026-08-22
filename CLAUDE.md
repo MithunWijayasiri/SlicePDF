@@ -14,6 +14,7 @@ Windows desktop PDF utility for page-level operations: split by named ranges, de
 | `SlicePDF.bat` | Double-click launcher → `pythonw slicepdf.py` (no console). |
 | `SlicePDF.spec` | PyInstaller config; source of truth for builds. |
 | `.github/workflows/build.yml` | CI on push + PR: compile, tests, Ruff, build, `SlicePDF.exe` artifact. |
+| `.github/workflows/release.yml` | Manual `workflow_dispatch` release: stamps the version, checks, tags, publishes. |
 | `docs/plan.md` | Private roadmap. |
 
 UI, font, and drag-and-drop specifics live in `.claude/rules/ui-design.md`, which loads automatically with `slicepdf.py`.
@@ -44,6 +45,7 @@ Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
 - Blank named-range rows ignored; at least one named range required.
 - Never overwrite: `unique_filename()` + `open(..., "xb")`. Source PDF is read-only.
 - Output folder defaults to the source PDF folder; another can be chosen.
+- `__version__` in `slicepdf.py` is the single version source: shown in the window title, read by `SlicePDF.spec` for the exe's Windows file properties, and rewritten by the release workflow.
 - Errors surface via `messagebox`; operations run on a daemon thread with updates marshalled through `self.after()`.
 
 ## Rules
@@ -53,4 +55,4 @@ Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
 - Long-running PDF work off the UI thread.
 - No machine-specific paths in `SlicePDF.spec`.
 - Unsigned executable may trigger a SmartScreen warning; signing out of scope.
-- Releases are manual; CI never creates them.
+- Releases run only from the manual `Release` workflow; `build.yml` never publishes one.

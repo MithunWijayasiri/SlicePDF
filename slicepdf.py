@@ -21,6 +21,8 @@ from pdf_operations import (
     unique_filename,
 )
 
+__version__ = "0.1.0"
+
 ctk.set_appearance_mode("light")
 
 PAPER = "#f7f3eb"
@@ -136,7 +138,7 @@ class App(ctk.CTk):
         super().__init__()
         TkinterDnD.require(self)
         self.fonts = resolve_fonts()
-        self.title("SlicePDF")
+        self.title(f"SlicePDF {__version__}")
         self.geometry("940x720")
         self.minsize(760, 600)
         self.configure(fg_color=PAPER)
