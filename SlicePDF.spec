@@ -21,6 +21,8 @@ version = match.group(1)
 # Windows wants four numbers, so a pre-release suffix such as 0.2.0-rc.1 is dropped here.
 numbers = [int(part) for part in version.split('-')[0].split('.')]
 version_numbers = tuple((numbers + [0, 0, 0, 0])[:4])
+if any(number > 0xFFFF for number in version_numbers):
+    raise SystemExit(f'Version {version} exceeds the 65535 limit of a Windows version field.')
 
 version_info = VSVersionInfo(
     ffi=FixedFileInfo(filevers=version_numbers, prodvers=version_numbers),
