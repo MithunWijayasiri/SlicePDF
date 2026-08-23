@@ -10,9 +10,15 @@
 <meta property="og:description" content="Split by named ranges, delete or keep pages, trim, reorder, merge. Windows, MIT licensed.">
 <meta property="og:url" content="https://mithunwijayasiri.github.io/SlicePDF/">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23E6E8E3'/><rect x='7' y='4' width='18' height='24' fill='%232233C9'/><path d='M4 12h24M4 21h24' stroke='%23FF2E63' stroke-width='2.5'/></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preload" href="fonts/manrope-regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/manrope-extrabold.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:'Manrope'; src:url('fonts/manrope-regular.woff2') format('woff2'); font-weight:400 500; font-style:normal; font-display:swap}
+@font-face{font-family:'Manrope'; src:url('fonts/manrope-bold.woff2') format('woff2'); font-weight:600 700; font-style:normal; font-display:swap}
+@font-face{font-family:'Manrope'; src:url('fonts/manrope-extrabold.woff2') format('woff2'); font-weight:800; font-style:normal; font-display:swap}
+@font-face{font-family:'JetBrains Mono'; src:url('fonts/JetBrainsMono-Regular.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap}
+@font-face{font-family:'JetBrains Mono'; src:url('fonts/JetBrainsMono-Medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap}
+</style>
 <style>
 :root{
   --stone:#e6e8e3; --rule:#d3d7cf; --sheet:#fbfbf9;
