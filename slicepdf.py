@@ -120,10 +120,16 @@ def pdf_load_problem(path: str, reader: PdfReader) -> str | None:
     return None
 
 
+def plural(number: int, noun: str) -> str:
+    """Return the count and noun, pluralized with a trailing s."""
+    return f"{number} {noun}{'' if number == 1 else 's'}"
+
+
 class RangeRow:
     """One output name plus its inclusive From/To page range."""
 
-    def __init__(self, master, fonts: dict[str, tuple], on_remove: Callable[["RangeRow"], None]):
+    def __init__(self, master, fonts: dict[str, tuple], on_remove: Callable[["RangeRow"], None],
+                 on_change: Callable[[], None]):
         self.frame = ctk.CTkFrame(master, fg_color="transparent")
         self.frame.grid_columnconfigure(0, weight=1)
         self.name_entry = ctk.CTkEntry(self.frame, placeholder_text="Output name", font=fonts["body"], **ENTRY_STYLE)
@@ -132,6 +138,8 @@ class RangeRow:
         self.from_entry.grid(row=0, column=1, padx=4)
         self.to_entry = ctk.CTkEntry(self.frame, width=78, placeholder_text="To", justify="center", font=fonts["body"], **ENTRY_STYLE)
         self.to_entry.grid(row=0, column=2, padx=4)
+        for entry in (self.name_entry, self.from_entry, self.to_entry):
+            entry.bind("<KeyRelease>", lambda _event: on_change())
         ctk.CTkButton(self.frame, text="×", width=30, height=36, corner_radius=3, fg_color="transparent", text_color=MUTED, hover_color=LINE, font=fonts["body"], command=lambda: on_remove(self)).grid(row=0, column=3, padx=(4, 0))
 
     def grid(self, **kwargs):
@@ -163,7 +171,7 @@ class App(ctk.CTk):
         self.rows: list[RangeRow] = []
         self.controls: dict[str, ctk.CTkEntry] = {}
         self.operation_buttons: dict[str, ctk.CTkButton] = {}
-        self.batch_hint: ctk.CTkLabel | None = None
+        self.outcome_hint: ctk.CTkLabel | None = None
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -267,7 +275,7 @@ class App(ctk.CTk):
             row.destroy()
         self.rows = []
         self.controls = {}
-        self.batch_hint = None
+        self.outcome_hint = None
         for child in self.fields.winfo_children():
             child.destroy()
 
@@ -278,41 +286,50 @@ class App(ctk.CTk):
             self.rows_frame.grid_columnconfigure(0, weight=1)
             ctk.CTkButton(self.fields, text="＋  Add another range", height=36, corner_radius=3, fg_color="transparent", text_color=ACCENT, hover_color=LINE, border_width=1, border_color=ACCENT, font=self.fonts["body"], command=self.add_row).grid(sticky="ew", padx=8, pady=(10, 0))
             self.add_row()
+            self._hint_label()
         elif mode in PAGE_FIELDS:
             label, example = PAGE_FIELDS[mode]
             self._field_label(label)
-            self._field_entry("pages", example)
+            self._field_entry("pages", example).bind("<KeyRelease>", self._update_hint)
+            self._hint_label()
             self._field_label("OUTPUT FILENAME (OPTIONAL)")
             self._field_entry("filename", "Example: selected-pages.pdf")
         elif mode == "trim":
             self._field_label("PAGES TO REMOVE FROM THE BEGINNING")
-            self._field_entry("start", "0", "0")
+            self._field_entry("start", "0", "0").bind("<KeyRelease>", self._update_hint)
             self._field_label("PAGES TO REMOVE FROM THE END")
-            self._field_entry("end", "0", "0")
+            self._field_entry("end", "0", "0").bind("<KeyRelease>", self._update_hint)
+            self._hint_label()
             self._field_label("OUTPUT FILENAME (OPTIONAL)")
             self._field_entry("filename", "Example: trimmed.pdf")
         elif mode == "count":
             self._field_label("PAGES PER OUTPUT FILE")
-            self._field_entry("count", "Example: 10").bind("<KeyRelease>", self._update_batch_hint)
-            self.batch_hint = ctk.CTkLabel(self.fields, text="", text_color=MUTED, font=self.fonts["small"], anchor="w")
-            self.batch_hint.grid(sticky="w", padx=8, pady=(6, 0))
+            self._field_entry("count", "Example: 10").bind("<KeyRelease>", self._update_hint)
+            self._hint_label()
             self._field_label("OUTPUT FILENAME PREFIX (OPTIONAL)")
             self._field_entry("filename", "Example: batch")
-            self._update_batch_hint()
         else:
             self._field_label("OUTPUT FILENAME (OPTIONAL)")
             self._field_entry("filename", "Example: combined.pdf")
+        self._update_hint()
+
+    def _hint_label(self):
+        """Grid the live outcome line under the fields that decide it."""
+        self.outcome_hint = ctk.CTkLabel(self.fields, text="", text_color=MUTED, font=self.fonts["small"], anchor="w")
+        self.outcome_hint.grid(sticky="w", padx=8, pady=(6, 0))
 
     def add_row(self):
-        row = RangeRow(self.rows_frame, self.fonts, self.remove_row)
+        row = RangeRow(self.rows_frame, self.fonts, self.remove_row, self._update_hint)
         row.grid(sticky="ew", padx=8, pady=3)
         self.rows.append(row)
+        self._update_hint()
 
     def remove_row(self, row):
         row.destroy()
         self.rows.remove(row)
         if not self.rows:
             self.add_row()
+        self._update_hint()
 
     def _update_source_panel(self):
         if not self.pdf_paths:
@@ -326,14 +343,52 @@ class App(ctk.CTk):
             self.source_name.configure(text=os.path.basename(self.pdf_paths[0]))
             self.source_meta.configure(text=f"PDF · {self.total_pages} pages")
 
-    def _update_batch_hint(self, _event=None):
-        if self.batch_hint is None:
-            return
-        value = self.form_value("count")
-        text = ""
-        if self.total_pages and value.isdigit() and int(value) > 0:
-            text = f"{self.total_pages} pages → {len(split_by_count(self.total_pages, int(value)))} files."
-        self.batch_hint.configure(text=text)
+    def _update_hint(self, _event=None):
+        if self.outcome_hint is not None:
+            self.outcome_hint.configure(text=self._hint_text())
+
+    def _hint_text(self) -> str:
+        """Describe what the current fields would produce, or nothing while they are unusable."""
+        if not self.total_pages:
+            return ""
+        source = plural(self.total_pages, "page")
+        try:
+            if self.mode == "named":
+                ranges = self._hint_ranges()
+                if not ranges:
+                    return ""
+                pages = sum(end - start + 1 for start, end in ranges)
+                return f"{plural(len(ranges), 'file')} → {pages} of {source}."
+            if self.mode == "count":
+                value = self.form_value("count")
+                if not value.isdigit():
+                    return ""
+                batches = split_by_count(self.total_pages, int(value))
+                return f"{source} → {plural(len(batches), 'file')}."
+            if self.mode == "trim":
+                start, end = self.form_value("start", "0"), self.form_value("end", "0")
+                if not (start.isdigit() and end.isdigit()) or not int(start) + int(end):
+                    return ""
+                kept = trim_pages(self.total_pages, int(start), int(end))
+                return f"{source} → {plural(len(kept), 'page')}."
+            if self.mode in PAGE_FIELDS:
+                kept = self._select_pages(self.mode, self.form_value("pages"), self.total_pages)
+                return f"{source} → {plural(len(kept), 'page')}."
+        except ValueError:
+            return ""
+        return ""
+
+    def _hint_ranges(self) -> list[tuple[int, int]]:
+        """Return the filled-in ranges, or nothing if any of them is not yet usable."""
+        ranges = []
+        for row in self.rows:
+            if row.is_blank():
+                continue
+            name, start, end = row.values()
+            if not name or not (start.isdigit() and end.isdigit()) or not (1 <= int(start) <= int(end) <= self.total_pages):
+                return []
+            ranges.append((int(start), int(end)))
+        return ranges
 
     def _register_drop_zone(self, widget):
         """Accept dropped PDFs on the drop zone and every widget drawn inside it."""
@@ -375,7 +430,7 @@ class App(ctk.CTk):
         self.total_pages = len(readers[0].pages)
         self.pdf_paths = list(paths)
         self._update_source_panel()
-        self._update_batch_hint()
+        self._update_hint()
         self.set_message("")
 
     def choose_output(self):
@@ -518,7 +573,7 @@ class App(ctk.CTk):
 
     def _done(self, count, directory):
         self._finish()
-        files = f"{count} file{'' if count == 1 else 's'}"
+        files = plural(count, "file")
         self.set_message(f"Done — {files} saved.", SUCCESS)
         if messagebox.askyesno("Finished", f"Created {files} in:\n{directory}\n\nOpen the folder?"):
             os.startfile(directory)
@@ -527,7 +582,7 @@ class App(ctk.CTk):
         self._finish()
         self.set_message("The operation did not finish.", ERROR)
         if written:
-            files = f"{written} file{'' if written == 1 else 's'}"
+            files = plural(written, "file")
             left = "It is" if written == 1 else "They are"
             message = f"{message}\n\nStopped after writing {files}. {left} still in {directory}."
         messagebox.showerror("Error", message)
