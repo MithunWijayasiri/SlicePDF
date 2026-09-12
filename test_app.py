@@ -94,6 +94,16 @@ class AppTestCase(unittest.TestCase):
         self.app.controls[key].delete(0, "end")
         self.app.controls[key].insert(0, value)
 
+    def hint(self):
+        self.app._update_hint()
+        return self.app.outcome_hint.cget("text")
+
+    def fill_range(self, index, start, end):
+        while len(self.app.rows) <= index:
+            self.app.add_row()
+        self.app.rows[index].from_entry.insert(0, start)
+        self.app.rows[index].to_entry.insert(0, end)
+
     def drop_payload(self, *paths):
         """Build the string tkdnd delivers as %D: a quoted Tcl list of paths."""
         return self.app.tk.call("format", "%s", self.app.tk.call("list", *paths))
@@ -189,13 +199,69 @@ class WorkspaceTests(AppTestCase):
         self.assertEqual(self.app.pdf_paths, [self.source])
         self.assertEqual(self.app.total_pages, 6)
 
-    def test_batch_hint_appears_once_source_and_count_are_valid(self):
+    def test_hint_stays_empty_until_a_source_is_chosen(self):
         self.app.change_operation("count")
-        self.assertEqual(self.app.batch_hint.cget("text"), "")
+        self.fill("count", "4")
+        self.assertEqual(self.hint(), "")
+
+    def test_count_hint_reports_the_files_it_would_write(self):
+        self.app.change_operation("count")
         self.load(self.source)
         self.fill("count", "4")
-        self.app._update_batch_hint()
-        self.assertEqual(self.app.batch_hint.cget("text"), "6 pages → 2 files.")
+        self.assertEqual(self.hint(), "6 pages → 2 files.")
+
+    def test_count_hint_reads_as_singular_for_one_file(self):
+        self.app.change_operation("count")
+        self.load(self.source)
+        self.fill("count", "6")
+        self.assertEqual(self.hint(), "6 pages → 1 file.")
+
+    def test_keep_hint_counts_the_pages_kept(self):
+        self.app.change_operation("keep")
+        self.load(self.source)
+        self.fill("pages", "1-3, 5")
+        self.assertEqual(self.hint(), "6 pages → 4 pages.")
+
+    def test_delete_hint_counts_the_pages_left(self):
+        self.app.change_operation("delete")
+        self.load(self.source)
+        self.fill("pages", "2, 5-6")
+        self.assertEqual(self.hint(), "6 pages → 3 pages.")
+
+    def test_trim_hint_waits_until_something_is_removed(self):
+        self.app.change_operation("trim")
+        self.load(self.source)
+        self.assertEqual(self.hint(), "")
+        self.fill("start", "1")
+        self.fill("end", "2")
+        self.assertEqual(self.hint(), "6 pages → 3 pages.")
+
+    def test_named_hint_counts_files_and_the_pages_they_use(self):
+        self.app.change_operation("named")
+        self.load(self.source)
+        self.fill_range(0, "1", "2")
+        self.fill_range(1, "3", "6")
+        self.assertEqual(self.hint(), "2 files → 6 of 6 pages.")
+
+    def test_named_hint_ignores_a_range_that_is_still_blank(self):
+        self.app.change_operation("named")
+        self.load(self.source)
+        self.fill_range(0, "1", "2")
+        self.app.add_row()
+        self.assertEqual(self.hint(), "1 file → 2 of 6 pages.")
+
+    def test_hint_stays_empty_while_the_input_is_unusable(self):
+        self.app.change_operation("keep")
+        self.load(self.source)
+        self.fill("pages", "1-")
+        self.assertEqual(self.hint(), "")
+        self.fill("pages", "9")
+        self.assertEqual(self.hint(), "")
+
+    def test_merge_has_no_outcome_hint(self):
+        self.app.change_operation("merge")
+        self.load(self.source, self.source)
+        self.assertIsNone(self.app.outcome_hint)
 
     def test_file_button_wording_matches_the_operation(self):
         self.app.change_operation("merge")
