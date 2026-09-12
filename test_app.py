@@ -98,9 +98,10 @@ class AppTestCase(unittest.TestCase):
         self.app._update_hint()
         return self.app.outcome_hint.cget("text")
 
-    def fill_range(self, index, start, end):
+    def fill_range(self, index, start, end, name="Part"):
         while len(self.app.rows) <= index:
             self.app.add_row()
+        self.app.rows[index].name_entry.insert(0, name)
         self.app.rows[index].from_entry.insert(0, start)
         self.app.rows[index].to_entry.insert(0, end)
 
@@ -249,6 +250,12 @@ class WorkspaceTests(AppTestCase):
         self.fill_range(0, "1", "2")
         self.app.add_row()
         self.assertEqual(self.hint(), "1 file → 2 of 6 pages.")
+
+    def test_named_hint_waits_for_an_output_name(self):
+        self.app.change_operation("named")
+        self.load(self.source)
+        self.fill_range(0, "1", "2", name="")
+        self.assertEqual(self.hint(), "")
 
     def test_hint_stays_empty_while_the_input_is_unusable(self):
         self.app.change_operation("keep")

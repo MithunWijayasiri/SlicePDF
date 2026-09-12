@@ -138,7 +138,7 @@ class RangeRow:
         self.from_entry.grid(row=0, column=1, padx=4)
         self.to_entry = ctk.CTkEntry(self.frame, width=78, placeholder_text="To", justify="center", font=fonts["body"], **ENTRY_STYLE)
         self.to_entry.grid(row=0, column=2, padx=4)
-        for entry in (self.from_entry, self.to_entry):
+        for entry in (self.name_entry, self.from_entry, self.to_entry):
             entry.bind("<KeyRelease>", lambda _event: on_change())
         ctk.CTkButton(self.frame, text="×", width=30, height=36, corner_radius=3, fg_color="transparent", text_color=MUTED, hover_color=LINE, font=fonts["body"], command=lambda: on_remove(self)).grid(row=0, column=3, padx=(4, 0))
 
@@ -384,8 +384,8 @@ class App(ctk.CTk):
         for row in self.rows:
             if row.is_blank():
                 continue
-            _, start, end = row.values()
-            if not (start.isdigit() and end.isdigit()) or not (1 <= int(start) <= int(end) <= self.total_pages):
+            name, start, end = row.values()
+            if not name or not (start.isdigit() and end.isdigit()) or not (1 <= int(start) <= int(end) <= self.total_pages):
                 return []
             ranges.append((int(start), int(end)))
         return ranges
