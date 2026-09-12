@@ -41,6 +41,17 @@ def make_pdf(directory: str, name: str, pages: int, first_width: int = 200) -> s
     return path
 
 
+def make_encrypted_pdf(directory: str, name: str, user_password: str = "pw", owner_password: str = "owner") -> str:
+    """Write a password-protected PDF. An empty user password leaves it openable by any viewer."""
+    path = os.path.join(directory, name)
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.encrypt(user_password, owner_password=owner_password)
+    with open(path, "wb") as handle:
+        writer.write(handle)
+    return path
+
+
 @unittest.skipUnless(TK_AVAILABLE, "Tk cannot open a window in this environment")
 class AppTestCase(unittest.TestCase):
     """A hidden App instance with dialogs captured instead of shown."""
@@ -203,6 +214,30 @@ class WorkspaceTests(AppTestCase):
         self.assertEqual(self.app.pdf_paths, [])
         self.assertIn("Could not read PDF", self.dialogs[0])
 
+    def test_empty_pdf_is_rejected_at_load(self):
+        self.load(make_pdf(self.work, "empty.pdf", 0))
+        self.assertEqual(self.app.pdf_paths, [])
+        self.assertIn("empty.pdf has no pages.", self.dialogs[0])
+
+    def test_password_protected_pdf_is_rejected_at_load(self):
+        self.load(make_encrypted_pdf(self.work, "locked.pdf"))
+        self.assertEqual(self.app.pdf_paths, [])
+        self.assertIn("locked.pdf is password-protected. SlicePDF cannot open it.", self.dialogs[0])
+
+    def test_pdf_openable_with_an_empty_password_is_still_adopted(self):
+        restricted = make_encrypted_pdf(self.work, "print-restricted.pdf", user_password="")
+        self.load(restricted)
+        self.assertEqual(self.app.pdf_paths, [restricted])
+        self.assertEqual(self.app.total_pages, 1)
+        self.assertEqual(self.dialogs, [])
+
+    def test_one_bad_file_rejects_the_whole_merge_selection(self):
+        self.app.change_operation("merge")
+        self.load(self.source)
+        self.load(self.source, make_pdf(self.work, "empty.pdf", 0))
+        self.assertEqual(self.app.pdf_paths, [self.source])
+        self.assertIn("empty.pdf has no pages.", self.dialogs[0])
+
 
 class DropZoneTests(AppTestCase):
     def test_every_widget_in_the_drop_zone_accepts_drops(self):
@@ -325,6 +360,36 @@ class OperationOutputTests(AppTestCase):
     def test_source_pdf_is_left_untouched(self):
         self.run_operation("count", (2, "batch"))
         self.assertEqual(len(PdfReader(self.source).pages), 6)
+
+    def test_failure_partway_leaves_a_complete_file_on_disk(self):
+        directory = tempfile.mkdtemp(dir=self.work)
+        real_write = PdfWriter.write
+        writes = []
+
+        def fail_on_the_second(writer, stream):
+            writes.append(stream)
+            if len(writes) > 1:
+                raise OSError("The disk is full.")
+            return real_write(writer, stream)
+
+        with mock.patch.object(PdfWriter, "write", fail_on_the_second):
+            self.run_operation("count", (2, "batch"), destination=directory)
+        self.assertIn("The disk is full.", self.dialogs[-1])
+        self.assertIn(f"Stopped after writing 1 file. It is still in {directory}.", self.dialogs[-1])
+        self.assertEqual(len(PdfReader(os.path.join(directory, "batch-1.pdf")).pages), 2)
+        self.assertEqual(os.listdir(directory), ["batch-1.pdf"])
+
+    def test_failure_later_names_every_file_and_the_folder(self):
+        directory = tempfile.mkdtemp(dir=self.work)
+        with mock.patch.object(PdfWriter, "write", side_effect=[None, None, OSError("The disk is full.")]):
+            self.run_operation("count", (2, "batch"), destination=directory)
+        self.assertIn(f"Stopped after writing 2 files. They are still in {directory}.", self.dialogs[-1])
+
+    def test_failure_before_any_write_does_not_claim_partial_files(self):
+        self.app.out_dir = tempfile.mkdtemp(dir=self.work)
+        self.run_inline("keep", [os.path.join(self.work, "missing.pdf")], ("1-2", "kept.pdf"))
+        self.assertIn("Error", self.dialogs[-1])
+        self.assertNotIn("Stopped after writing", self.dialogs[-1])
 
 
 class ValidationTests(AppTestCase):
