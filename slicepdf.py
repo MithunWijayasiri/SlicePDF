@@ -106,6 +106,20 @@ def resolve_fonts() -> dict[str, tuple]:
     }
 
 
+def pdf_load_problem(path: str, reader: PdfReader) -> str | None:
+    """Return a plain-language reason a loaded PDF cannot be used, or None when it can."""
+    name = os.path.basename(path)
+    try:
+        page_count = len(reader.pages)
+    except PdfReadError:
+        if reader.is_encrypted:
+            return f"{name} is password-protected. SlicePDF cannot open it."
+        raise
+    if page_count == 0:
+        return f"{name} has no pages."
+    return None
+
+
 class RangeRow:
     """One output name plus its inclusive From/To page range."""
 
@@ -346,13 +360,19 @@ class App(ctk.CTk):
 
     def _load_paths(self, paths):
         """Adopt chosen or dropped PDFs after checking every one can be read."""
+        readers = []
         try:
-            self.total_pages = len(PdfReader(paths[0]).pages)
-            for path in paths[1:]:
-                PdfReader(path)
+            for path in paths:
+                reader = PdfReader(path)
+                problem = pdf_load_problem(path, reader)
+                if problem:
+                    messagebox.showerror("Could not read PDF", problem)
+                    return
+                readers.append(reader)
         except (OSError, PdfReadError) as error:
             messagebox.showerror("Could not read PDF", str(error))
             return
+        self.total_pages = len(readers[0].pages)
         self.pdf_paths = list(paths)
         self._update_source_panel()
         self._update_batch_hint()
@@ -435,6 +455,9 @@ class App(ctk.CTk):
         return [page for page in range(total_pages) if page not in selected]
 
     def _run(self, mode, paths, payload):
+        written = 0
+        destination = None
+        partial = None
         try:
             readers = [PdfReader(path) for path in paths]
             total_pages = len(readers[0].pages)
@@ -459,13 +482,28 @@ class App(ctk.CTk):
                     reader, page_index = page if mode == "merge" else (readers[0], page)
                     writer.add_page(reader.pages[page_index])
                 filename = unique_filename(filename, destination, used)
-                with open(os.path.join(destination, filename), "xb") as output_file:
+                partial = os.path.join(destination, filename)
+                with open(partial, "xb") as output_file:
                     writer.write(output_file)
+                partial = None
+                written = index
                 self.after(0, self._tick, index / len(outputs), filename)
             self.after(0, self._done, len(outputs), destination)
         # Blind on purpose: an escaped exception would leave the run button disabled for good.
         except Exception as error:  # noqa: BLE001
-            self.after(0, self._fail, str(error) or error.__class__.__name__)
+            self._discard_partial(partial)
+            self.after(0, self._fail, str(error) or error.__class__.__name__, written, destination)
+
+    @staticmethod
+    def _discard_partial(path):
+        """Remove the half-written output of a failed run so its name is free again."""
+        if not path:
+            return
+        try:
+            os.remove(path)
+        # A cleanup failure must not replace the error the user actually needs to read.
+        except OSError:
+            pass
 
     def set_message(self, text, color=MUTED):
         self.message.configure(text=text, text_color=color)
@@ -485,9 +523,13 @@ class App(ctk.CTk):
         if messagebox.askyesno("Finished", f"Created {files} in:\n{directory}\n\nOpen the folder?"):
             os.startfile(directory)
 
-    def _fail(self, message):
+    def _fail(self, message, written, directory):
         self._finish()
         self.set_message("The operation did not finish.", ERROR)
+        if written:
+            files = f"{written} file{'' if written == 1 else 's'}"
+            left = "It is" if written == 1 else "They are"
+            message = f"{message}\n\nStopped after writing {files}. {left} still in {directory}."
         messagebox.showerror("Error", message)
 
 
