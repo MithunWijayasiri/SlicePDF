@@ -105,6 +105,9 @@ class AppTestCase(unittest.TestCase):
 
     def close_app(self):
         """Cancel CustomTkinter's pending after() callbacks so teardown stays quiet."""
+        # With its callbacks cancelled, an open CTkToplevel breaks the root's destroy.
+        if self.app.about_window is not None:
+            self.app.about_window.destroy()
         for after_id in self.app.tk.splitlist(self.app.tk.call("after", "info")):
             self.app.after_cancel(after_id)
         self.app.destroy()
@@ -206,7 +209,14 @@ class WorkspaceTests(AppTestCase):
 
     def test_empty_source_panel_state(self):
         self.assertEqual(self.app.source_name.cget("text"), "Nothing on the desk yet")
-        self.assertEqual(self.app.source_meta.cget("text"), "PDF · — pages")
+        self.assertEqual(self.app.source_meta.cget("text"), "")
+        self.assertEqual(self.app.drop_headline.cget("text"), "Place a PDF on the desk")
+
+    def test_drop_zone_offers_to_replace_a_loaded_source(self):
+        self.load(self.source)
+        self.assertEqual(self.app.drop_headline.cget("text"), "Drop another PDF to replace this one")
+        self.app.change_operation("merge")
+        self.assertEqual(self.app.drop_headline.cget("text"), "Drop other PDFs to replace these")
 
     def test_loaded_source_panel_shows_name_and_page_count(self):
         self.load(self.source)
@@ -314,7 +324,26 @@ class WorkspaceTests(AppTestCase):
         self.app = slicepdf.App()
         self.app.withdraw()
         self.assertEqual(self.app.out_dir, folder)
-        self.assertEqual(self.app.out_label.cget("text"), f"Save to {folder}")
+        self.assertTrue(self.app.out_label.cget("text").endswith(os.path.basename(folder)))
+
+    def test_long_output_folder_keeps_its_last_folder_names(self):
+        self.assertEqual(slicepdf.short_path("D:/Reports/Split"), r"D:\Reports\Split")
+        long = r"C:\Users\someone\OneDrive - Company\Documents\Clients\2026\Reports"
+        self.assertEqual(slicepdf.short_path(long), r"…\Documents\Clients\2026\Reports")
+
+    def test_about_window_links_to_the_project(self):
+        self.app.show_about()
+        buttons = {child.cget("text"): child for child in self.app.about_window.winfo_children() if isinstance(child, slicepdf.ctk.CTkButton)}
+        self.assertEqual(list(buttons), list(slicepdf.LINKS))
+        with mock.patch.object(slicepdf.webbrowser, "open") as opened:
+            buttons["Releases"].invoke()
+        opened.assert_called_once_with("https://github.com/MithunWijayasiri/SlicePDF/releases")
+
+    def test_about_opens_only_one_window(self):
+        self.app.show_about()
+        first = self.app.about_window
+        self.app.show_about()
+        self.assertIs(self.app.about_window, first)
 
     def test_remembered_folder_that_no_longer_exists_is_ignored(self):
         os.makedirs(os.path.dirname(slicepdf.FOLDER_FILE))
