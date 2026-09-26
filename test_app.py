@@ -351,6 +351,12 @@ class WorkspaceTests(AppTestCase):
             handle.write(os.path.join(self.work, "gone"))
         self.assertIsNone(slicepdf.remembered_folder())
 
+    def test_unreadable_remembered_folder_file_is_ignored(self):
+        os.makedirs(os.path.dirname(slicepdf.FOLDER_FILE))
+        with open(slicepdf.FOLDER_FILE, "wb") as handle:
+            handle.write(b"\xff\xfe\x00bad")
+        self.assertIsNone(slicepdf.remembered_folder())
+
     def test_unreadable_source_is_reported_and_not_adopted(self):
         broken = os.path.join(self.work, "broken.pdf")
         with open(broken, "wb") as handle:

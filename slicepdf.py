@@ -132,7 +132,7 @@ def remembered_folder() -> str | None:
     try:
         with open(FOLDER_FILE, encoding="utf-8") as handle:
             folder = handle.read().strip()
-    except FileNotFoundError:
+    except (OSError, UnicodeError):
         return None
     return folder if os.path.isdir(folder) else None
 
