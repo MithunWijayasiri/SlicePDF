@@ -4,6 +4,7 @@ import os
 import sys
 import threading
 import tkinter.font
+import webbrowser
 from collections.abc import Callable
 from tkinter import filedialog, messagebox
 
@@ -39,6 +40,12 @@ ERROR = "#a04435"
 
 FR_PRIVATE = 0x10
 FONT_FALLBACK = "Corbel"
+FOLDER_FILE = os.path.join(os.environ["APPDATA"], "SlicePDF", "output-folder.txt")
+LINKS = {
+    "GitHub repository": "https://github.com/MithunWijayasiri/SlicePDF",
+    "Website": "https://mithunwijayasiri.github.io/SlicePDF/",
+    "Releases": "https://github.com/MithunWijayasiri/SlicePDF/releases",
+}
 
 OPERATIONS = {
     "Split by named ranges": "named",
@@ -120,6 +127,26 @@ def pdf_load_problem(path: str, reader: PdfReader) -> str | None:
     return None
 
 
+def remembered_folder() -> str | None:
+    """Return the last chosen output folder, or None if none was saved or it no longer exists."""
+    try:
+        with open(FOLDER_FILE, encoding="utf-8") as handle:
+            folder = handle.read().strip()
+    except (OSError, UnicodeError):
+        return None
+    return folder if os.path.isdir(folder) else None
+
+
+def short_path(path: str, limit: int = 40) -> str:
+    """Shorten a long folder path from the left, keeping its last folder names whole."""
+    path = os.path.normpath(path)
+    if len(path) <= limit:
+        return path
+    tail = path[-limit:]
+    cut = tail.find(os.sep)
+    return "…" + (tail[cut:] if cut != -1 else tail)
+
+
 def plural(number: int, noun: str) -> str:
     """Return the count and noun, pluralized with a trailing s."""
     return f"{number} {noun}{'' if number == 1 else 's'}"
@@ -172,12 +199,17 @@ class App(ctk.CTk):
         self.controls: dict[str, ctk.CTkEntry] = {}
         self.operation_buttons: dict[str, ctk.CTkButton] = {}
         self.outcome_hint: ctk.CTkLabel | None = None
+        self.cancel_requested = threading.Event()
+        self.about_window: ctk.CTkToplevel | None = None
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self._build_sidebar()
         self._build_workspace()
         self.change_operation("named")
+        folder = remembered_folder()
+        if folder:
+            self.set_output_folder(folder)
 
     def _build_sidebar(self):
         sidebar = ctk.CTkFrame(self, width=270, corner_radius=0, fg_color=SIDEBAR)
@@ -190,19 +222,15 @@ class App(ctk.CTk):
             button = ctk.CTkButton(sidebar, text=label, anchor="w", height=38, corner_radius=4, fg_color="transparent", hover_color=LINE, text_color=MUTED, font=self.fonts["body"], command=lambda selected=mode: self.change_operation(selected))
             button.pack(fill="x", padx=16, pady=2)
             self.operation_buttons[mode] = button
-
+        ctk.CTkButton(sidebar, text="About SlicePDF", anchor="w", height=32, corner_radius=4, fg_color="transparent", hover_color=LINE, text_color=MUTED, font=self.fonts["small"], command=self.show_about).pack(side="bottom", fill="x", padx=16, pady=(0, 18))
     def _build_workspace(self):
         space = ctk.CTkFrame(self, corner_radius=0, fg_color=PAPER)
         space.grid(row=0, column=1, sticky="nsew")
         space.grid_columnconfigure(0, weight=1)
         space.grid_rowconfigure(4, weight=1)
 
-        head = ctk.CTkFrame(space, fg_color="transparent")
-        head.grid(row=0, column=0, sticky="ew", padx=30, pady=(26, 0))
-        head.grid_columnconfigure(0, weight=1)
-        self.title_label = ctk.CTkLabel(head, text="", text_color=INK, font=self.fonts["display"], anchor="w")
-        self.title_label.grid(row=0, column=0, sticky="w")
-        ctk.CTkLabel(head, text="PRIVATE WORKFLOW", text_color=SUCCESS, font=self.fonts["label"], anchor="e").grid(row=0, column=1, sticky="e", pady=(10, 0))
+        self.title_label = ctk.CTkLabel(space, text="", text_color=INK, font=self.fonts["display"], anchor="w")
+        self.title_label.grid(row=0, column=0, sticky="ew", padx=30, pady=(26, 0))
         self.description = ctk.CTkLabel(space, text="", text_color=MUTED, font=self.fonts["body"], anchor="w")
         self.description.grid(row=1, column=0, sticky="ew", padx=30, pady=(2, 18))
 
@@ -217,13 +245,13 @@ class App(ctk.CTk):
         drop = ctk.CTkFrame(space, fg_color=SURFACE, border_color=LINE, border_width=1, corner_radius=4)
         drop.grid(row=3, column=0, sticky="ew", padx=30, pady=16)
         drop.grid_columnconfigure(0, weight=1)
-        headline = ctk.CTkLabel(drop, text="Place a PDF on the desk", text_color=INK, font=self.fonts["strong"])
-        headline.grid(row=0, column=0, pady=(20, 2))
+        self.drop_headline = ctk.CTkLabel(drop, text="", text_color=INK, font=self.fonts["strong"])
+        self.drop_headline.grid(row=0, column=0, pady=(20, 2))
         hint = ctk.CTkLabel(drop, text="Drag it here or choose one from your files", text_color=MUTED, font=self.fonts["small"])
         hint.grid(row=1, column=0)
         self.file_button = ctk.CTkButton(drop, text="Choose PDF…", width=140, height=34, corner_radius=3, fg_color="transparent", text_color=ACCENT, hover_color=LINE, border_width=1, border_color=ACCENT, font=self.fonts["body"], command=self.choose_file)
         self.file_button.grid(row=2, column=0, pady=(14, 20))
-        for widget in (drop, headline, hint):
+        for widget in (drop, self.drop_headline, hint):
             widget.bind("<Button-1>", lambda _event: self.choose_file())
         self.drop_zone = drop
         self._register_drop_zone(drop)
@@ -244,6 +272,7 @@ class App(ctk.CTk):
         self.run_button.grid(row=0, column=2)
 
         self.progress = ctk.CTkProgressBar(space, height=6, corner_radius=3, fg_color=LINE, progress_color=ACCENT)
+        self.cancel_button = ctk.CTkButton(space, text="Cancel", width=90, height=28, corner_radius=3, fg_color="transparent", text_color=ACCENT, hover_color=LINE, border_width=1, border_color=ACCENT, font=self.fonts["small"], command=self.cancel_operation)
         self.message = ctk.CTkLabel(space, text="", text_color=MUTED, font=self.fonts["small"], anchor="w")
         self.message.grid(row=8, column=0, sticky="ew", padx=30, pady=(0, 14))
         self._update_source_panel()
@@ -332,9 +361,15 @@ class App(ctk.CTk):
         self._update_hint()
 
     def _update_source_panel(self):
+        many = self.mode == "merge"
+        if self.pdf_paths:
+            headline = "Drop other PDFs to replace these" if many else "Drop another PDF to replace this one"
+        else:
+            headline = "Place PDFs on the desk" if many else "Place a PDF on the desk"
+        self.drop_headline.configure(text=headline)
         if not self.pdf_paths:
             self.source_name.configure(text="Nothing on the desk yet")
-            self.source_meta.configure(text="PDF · — pages")
+            self.source_meta.configure(text="")
         elif self.mode == "merge":
             count = len(self.pdf_paths)
             self.source_name.configure(text=f"{count} PDF{'' if count == 1 else 's'} selected")
@@ -436,8 +471,32 @@ class App(ctk.CTk):
     def choose_output(self):
         directory = filedialog.askdirectory(title="Choose output folder")
         if directory:
-            self.out_dir = directory
-            self.out_label.configure(text=f"Save to {directory}", text_color=INK)
+            self.set_output_folder(directory)
+            os.makedirs(os.path.dirname(FOLDER_FILE), exist_ok=True)
+            with open(FOLDER_FILE, "w", encoding="utf-8") as handle:
+                handle.write(directory)
+
+    def set_output_folder(self, directory):
+        self.out_dir = directory
+        self.out_label.configure(text=f"Save to {short_path(directory)}", text_color=INK)
+
+    def show_about(self):
+        """Open the About window, or bring the open one forward."""
+        if self.about_window is not None and self.about_window.winfo_exists():
+            self.about_window.focus()
+            return
+        about = ctk.CTkToplevel(self, fg_color=PAPER)
+        about.title("About SlicePDF")
+        about.resizable(False, False)
+        about.transient(self)
+        about.bind("<Escape>", lambda _event: about.destroy())
+        ctk.CTkLabel(about, text="SlicePDF", text_color=INK, font=self.fonts["brand"], anchor="w").pack(fill="x", padx=28, pady=(24, 0))
+        ctk.CTkLabel(about, text=f"Version {__version__}", text_color=ACCENT, font=self.fonts["label"], anchor="w").pack(fill="x", padx=29, pady=(2, 14))
+        ctk.CTkLabel(about, text="Everyday PDF page edits on your own computer.\nNo uploads and no tracking.", text_color=MUTED, font=self.fonts["body"], justify="left", anchor="w").pack(fill="x", padx=28, pady=(0, 18))
+        for label, url in LINKS.items():
+            ctk.CTkButton(about, text=label, width=300, height=36, corner_radius=3, fg_color="transparent", text_color=ACCENT, hover_color=LINE, border_width=1, border_color=ACCENT, font=self.fonts["body"], command=lambda link=url: webbrowser.open(link)).pack(padx=28, pady=4)
+        ctk.CTkLabel(about, text="Free and open source under the MIT License.", text_color=MUTED, font=self.fonts["small"], anchor="w").pack(fill="x", padx=28, pady=(16, 24))
+        self.about_window = about
 
     def collect_ranges(self):
         ranges = []
@@ -494,8 +553,10 @@ class App(ctk.CTk):
             messagebox.showerror("Check the operation", str(error))
             return
         self.run_button.configure(state="disabled")
+        self.cancel_requested.clear()
         self.progress.set(0)
-        self.progress.grid(row=7, column=0, sticky="ew", padx=30, pady=(0, 8))
+        self.progress.grid(row=7, column=0, sticky="ew", padx=(30, 136), pady=(0, 8))
+        self.cancel_button.grid(row=7, column=0, sticky="e", padx=30, pady=(0, 8))
         self.set_message("Working…")
         threading.Thread(target=self._run, args=(self.mode, list(self.pdf_paths), payload), daemon=True, name="slicepdf-worker").start()
 
@@ -531,6 +592,9 @@ class App(ctk.CTk):
             else:
                 outputs = [(self._select_pages(mode, payload[0], total_pages), safe_filename(payload[1] or f"{stem}-output.pdf", "output"))]
             for index, (pages, filename) in enumerate(outputs, 1):
+                if self.cancel_requested.is_set():
+                    self.after(0, self._cancelled, written)
+                    return
                 writer = PdfWriter()
                 if mode == "merge":
                     for reader in readers:
@@ -568,9 +632,18 @@ class App(ctk.CTk):
         self.progress.set(fraction)
         self.set_message(f"Wrote {filename}")
 
+    def cancel_operation(self):
+        self.cancel_requested.set()
+        self.set_message("Stopping after the current file…")
+
     def _finish(self):
         self.progress.grid_remove()
+        self.cancel_button.grid_remove()
         self.run_button.configure(state="normal")
+
+    def _cancelled(self, written):
+        self._finish()
+        self.set_message(f"Cancelled — {plural(written, 'file')} saved.")
 
     def _done(self, count, directory):
         self._finish()

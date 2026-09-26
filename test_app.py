@@ -95,6 +95,9 @@ class AppTestCase(unittest.TestCase):
         self.work = directory.name
         self.source = make_pdf(self.work, "source.pdf", 6)
         self.second = make_pdf(self.work, "appendix.pdf", 2, first_width=300)
+        patcher = mock.patch.object(slicepdf, "FOLDER_FILE", os.path.join(self.work, "settings", "output-folder.txt"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
         self.app = slicepdf.App()
         self.app.withdraw()
@@ -102,6 +105,9 @@ class AppTestCase(unittest.TestCase):
 
     def close_app(self):
         """Cancel CustomTkinter's pending after() callbacks so teardown stays quiet."""
+        # With its callbacks cancelled, an open CTkToplevel breaks the root's destroy.
+        if self.app.about_window is not None:
+            self.app.about_window.destroy()
         for after_id in self.app.tk.splitlist(self.app.tk.call("after", "info")):
             self.app.after_cancel(after_id)
         self.app.destroy()
@@ -203,7 +209,14 @@ class WorkspaceTests(AppTestCase):
 
     def test_empty_source_panel_state(self):
         self.assertEqual(self.app.source_name.cget("text"), "Nothing on the desk yet")
-        self.assertEqual(self.app.source_meta.cget("text"), "PDF · — pages")
+        self.assertEqual(self.app.source_meta.cget("text"), "")
+        self.assertEqual(self.app.drop_headline.cget("text"), "Place a PDF on the desk")
+
+    def test_drop_zone_offers_to_replace_a_loaded_source(self):
+        self.load(self.source)
+        self.assertEqual(self.app.drop_headline.cget("text"), "Drop another PDF to replace this one")
+        self.app.change_operation("merge")
+        self.assertEqual(self.app.drop_headline.cget("text"), "Drop other PDFs to replace these")
 
     def test_loaded_source_panel_shows_name_and_page_count(self):
         self.load(self.source)
@@ -301,6 +314,48 @@ class WorkspaceTests(AppTestCase):
 
     def test_progress_is_hidden_until_an_operation_runs(self):
         self.assertEqual(self.app.progress.grid_info(), {})
+        self.assertEqual(self.app.cancel_button.grid_info(), {})
+
+    def test_chosen_output_folder_is_remembered_for_the_next_launch(self):
+        folder = tempfile.mkdtemp(dir=self.work)
+        with mock.patch.object(slicepdf.filedialog, "askdirectory", return_value=folder):
+            self.app.choose_output()
+        self.close_app()
+        self.app = slicepdf.App()
+        self.app.withdraw()
+        self.assertEqual(self.app.out_dir, folder)
+        self.assertTrue(self.app.out_label.cget("text").endswith(os.path.basename(folder)))
+
+    def test_long_output_folder_keeps_its_last_folder_names(self):
+        self.assertEqual(slicepdf.short_path("D:/Reports/Split"), r"D:\Reports\Split")
+        long = r"C:\Users\someone\OneDrive - Company\Documents\Clients\2026\Reports"
+        self.assertEqual(slicepdf.short_path(long), r"…\Documents\Clients\2026\Reports")
+
+    def test_about_window_links_to_the_project(self):
+        self.app.show_about()
+        buttons = {child.cget("text"): child for child in self.app.about_window.winfo_children() if isinstance(child, slicepdf.ctk.CTkButton)}
+        self.assertEqual(list(buttons), list(slicepdf.LINKS))
+        with mock.patch.object(slicepdf.webbrowser, "open") as opened:
+            buttons["Releases"].invoke()
+        opened.assert_called_once_with("https://github.com/MithunWijayasiri/SlicePDF/releases")
+
+    def test_about_opens_only_one_window(self):
+        self.app.show_about()
+        first = self.app.about_window
+        self.app.show_about()
+        self.assertIs(self.app.about_window, first)
+
+    def test_remembered_folder_that_no_longer_exists_is_ignored(self):
+        os.makedirs(os.path.dirname(slicepdf.FOLDER_FILE))
+        with open(slicepdf.FOLDER_FILE, "w", encoding="utf-8") as handle:
+            handle.write(os.path.join(self.work, "gone"))
+        self.assertIsNone(slicepdf.remembered_folder())
+
+    def test_unreadable_remembered_folder_file_is_ignored(self):
+        os.makedirs(os.path.dirname(slicepdf.FOLDER_FILE))
+        with open(slicepdf.FOLDER_FILE, "wb") as handle:
+            handle.write(b"\xff\xfe\x00bad")
+        self.assertIsNone(slicepdf.remembered_folder())
 
     def test_unreadable_source_is_reported_and_not_adopted(self):
         broken = os.path.join(self.work, "broken.pdf")
@@ -482,6 +537,25 @@ class OperationOutputTests(OperationTestCase):
         with mock.patch.object(PdfWriter, "write", side_effect=[None, None, OSError("The disk is full.")]):
             self.run_operation("count", (2, "batch"), destination=directory)
         self.assertIn(f"Stopped after writing 2 files. They are still in {directory}.", self.dialogs[-1])
+
+    def test_cancel_before_the_first_file_writes_nothing(self):
+        self.app.cancel_requested.set()
+        out = self.run_operation("count", (2, "batch"))
+        self.assertEqual(os.listdir(out), [])
+        self.assertEqual(self.app.message.cget("text"), "Cancelled — 0 files saved.")
+        self.assertEqual(self.app.run_button.cget("state"), "normal")
+
+    def test_cancel_stops_after_the_current_file_and_keeps_it(self):
+        real_write = PdfWriter.write
+
+        def write_then_cancel(writer, stream):
+            real_write(writer, stream)
+            self.app.cancel_operation()
+
+        with mock.patch.object(PdfWriter, "write", write_then_cancel):
+            out = self.run_operation("count", (2, "batch"))
+        self.assertEqual(self.page_counts(out), {"batch-1.pdf": 2})
+        self.assertEqual(self.app.message.cget("text"), "Cancelled — 1 file saved.")
 
     def test_failure_before_any_write_does_not_claim_partial_files(self):
         self.app.out_dir = tempfile.mkdtemp(dir=self.work)
