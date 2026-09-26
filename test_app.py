@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 from pypdf import PdfReader, PdfWriter
+from pypdf.annotations import Link
 from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject
 
 import slicepdf
@@ -547,6 +548,18 @@ class LinksAndBookmarksTests(OperationTestCase):
         )
         self.assertEqual(self.link_target(out, "all.pdf", 0), 4)
         self.assertEqual(self.link_target(out, "all.pdf", 6), 10)
+
+    def test_link_written_as_a_bare_page_number_is_remapped(self):
+        # pypdf's Link helper writes a page number, not a page reference; append drops it before pypdf 6.16.
+        path = os.path.join(self.work, "numbered.pdf")
+        writer = PdfWriter()
+        for offset in range(6):
+            writer.add_blank_page(width=200 + offset, height=200)
+        writer.add_annotation(page_number=0, annotation=Link(rect=(0, 0, 100, 100), target_page_index=4))
+        with open(path, "wb") as handle:
+            writer.write(handle)
+        out = self.run_operation("keep", ("1, 5", "kept.pdf"), paths=[path])
+        self.assertEqual(self.link_target(out, "kept.pdf", 0), 1)
 
     def test_dropped_parent_bookmark_stays_as_a_heading_over_surviving_children(self):
         out = self.run_operation("keep", ("2-6", "kept.pdf"), paths=[self.linked])
