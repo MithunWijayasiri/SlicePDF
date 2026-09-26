@@ -39,6 +39,7 @@ ERROR = "#a04435"
 
 FR_PRIVATE = 0x10
 FONT_FALLBACK = "Corbel"
+FOLDER_FILE = os.path.join(os.environ["APPDATA"], "SlicePDF", "output-folder.txt")
 
 OPERATIONS = {
     "Split by named ranges": "named",
@@ -120,6 +121,16 @@ def pdf_load_problem(path: str, reader: PdfReader) -> str | None:
     return None
 
 
+def remembered_folder() -> str | None:
+    """Return the last chosen output folder, or None if none was saved or it no longer exists."""
+    try:
+        with open(FOLDER_FILE, encoding="utf-8") as handle:
+            folder = handle.read().strip()
+    except FileNotFoundError:
+        return None
+    return folder if os.path.isdir(folder) else None
+
+
 def plural(number: int, noun: str) -> str:
     """Return the count and noun, pluralized with a trailing s."""
     return f"{number} {noun}{'' if number == 1 else 's'}"
@@ -172,12 +183,16 @@ class App(ctk.CTk):
         self.controls: dict[str, ctk.CTkEntry] = {}
         self.operation_buttons: dict[str, ctk.CTkButton] = {}
         self.outcome_hint: ctk.CTkLabel | None = None
+        self.cancel_requested = threading.Event()
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self._build_sidebar()
         self._build_workspace()
         self.change_operation("named")
+        folder = remembered_folder()
+        if folder:
+            self.set_output_folder(folder)
 
     def _build_sidebar(self):
         sidebar = ctk.CTkFrame(self, width=270, corner_radius=0, fg_color=SIDEBAR)
@@ -244,6 +259,7 @@ class App(ctk.CTk):
         self.run_button.grid(row=0, column=2)
 
         self.progress = ctk.CTkProgressBar(space, height=6, corner_radius=3, fg_color=LINE, progress_color=ACCENT)
+        self.cancel_button = ctk.CTkButton(space, text="Cancel", width=90, height=28, corner_radius=3, fg_color="transparent", text_color=ACCENT, hover_color=LINE, border_width=1, border_color=ACCENT, font=self.fonts["small"], command=self.cancel_operation)
         self.message = ctk.CTkLabel(space, text="", text_color=MUTED, font=self.fonts["small"], anchor="w")
         self.message.grid(row=8, column=0, sticky="ew", padx=30, pady=(0, 14))
         self._update_source_panel()
@@ -436,8 +452,14 @@ class App(ctk.CTk):
     def choose_output(self):
         directory = filedialog.askdirectory(title="Choose output folder")
         if directory:
-            self.out_dir = directory
-            self.out_label.configure(text=f"Save to {directory}", text_color=INK)
+            self.set_output_folder(directory)
+            os.makedirs(os.path.dirname(FOLDER_FILE), exist_ok=True)
+            with open(FOLDER_FILE, "w", encoding="utf-8") as handle:
+                handle.write(directory)
+
+    def set_output_folder(self, directory):
+        self.out_dir = directory
+        self.out_label.configure(text=f"Save to {directory}", text_color=INK)
 
     def collect_ranges(self):
         ranges = []
@@ -494,8 +516,10 @@ class App(ctk.CTk):
             messagebox.showerror("Check the operation", str(error))
             return
         self.run_button.configure(state="disabled")
+        self.cancel_requested.clear()
         self.progress.set(0)
-        self.progress.grid(row=7, column=0, sticky="ew", padx=30, pady=(0, 8))
+        self.progress.grid(row=7, column=0, sticky="ew", padx=(30, 136), pady=(0, 8))
+        self.cancel_button.grid(row=7, column=0, sticky="e", padx=30, pady=(0, 8))
         self.set_message("Working…")
         threading.Thread(target=self._run, args=(self.mode, list(self.pdf_paths), payload), daemon=True, name="slicepdf-worker").start()
 
@@ -531,6 +555,9 @@ class App(ctk.CTk):
             else:
                 outputs = [(self._select_pages(mode, payload[0], total_pages), safe_filename(payload[1] or f"{stem}-output.pdf", "output"))]
             for index, (pages, filename) in enumerate(outputs, 1):
+                if self.cancel_requested.is_set():
+                    self.after(0, self._cancelled, written)
+                    return
                 writer = PdfWriter()
                 if mode == "merge":
                     for reader in readers:
@@ -568,9 +595,18 @@ class App(ctk.CTk):
         self.progress.set(fraction)
         self.set_message(f"Wrote {filename}")
 
+    def cancel_operation(self):
+        self.cancel_requested.set()
+        self.set_message("Stopping after the current file…")
+
     def _finish(self):
         self.progress.grid_remove()
+        self.cancel_button.grid_remove()
         self.run_button.configure(state="normal")
+
+    def _cancelled(self, written):
+        self._finish()
+        self.set_message(f"Cancelled — {plural(written, 'file')} saved.")
 
     def _done(self, count, directory):
         self._finish()

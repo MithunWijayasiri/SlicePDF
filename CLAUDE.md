@@ -44,7 +44,8 @@ Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
 - Page expressions accept `2, 5-7, 12`. `delete`/`keep` dedupe silently; `reorder` rejects a repeated page (`parse_page_order`).
 - Blank named-range rows ignored; at least one named range required.
 - Never overwrite: `unique_filename()` + `open(..., "xb")`. Source PDF is read-only.
-- Output folder defaults to the source PDF folder; another can be chosen.
+- Output folder defaults to the source PDF folder; another can be chosen. Chosen folder saved to `%APPDATA%\SlicePDF\output-folder.txt`, restored at launch; ignored if it no longer exists.
+- Cancel stops between files; files already written stay.
 - `__version__` in `slicepdf.py` is the single version source: shown in the window title, read by `SlicePDF.spec` for the exe's Windows file properties, and rewritten by the release workflow.
 - Errors surface via `messagebox`; operations run on a daemon thread with updates marshalled through `self.after()`.
 - Internal links and bookmarks carry over via `PdfWriter.append`; ones pointing at a page the output lacks are dropped. A dropped parent bookmark with surviving children stays as a destination-less heading.

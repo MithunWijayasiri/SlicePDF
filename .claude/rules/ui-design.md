@@ -42,7 +42,7 @@ duplicate file selectors · competing primary actions · cards that only repeat 
 ## Interaction invariants
 
 - PDF work runs off the UI thread; updates marshal back via `self.after()`.
-- Run button disabled while working; progress bar gridded only while working.
+- Run button disabled while working; progress bar and its secondary `Cancel` button gridded only while working.
 - Never overwrite: `unique_filename()` + `open(..., "xb")`. Source PDF is read-only.
 - Validation dialogs in plain, non-technical language.
 
