@@ -7,6 +7,8 @@ import unittest
 from unittest import mock
 
 from pypdf import PdfReader, PdfWriter
+from pypdf.annotations import Link
+from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject
 
 import slicepdf
 
@@ -36,6 +38,27 @@ def make_pdf(directory: str, name: str, pages: int, first_width: int = 200) -> s
     writer = PdfWriter()
     for offset in range(pages):
         writer.add_blank_page(width=first_width + offset, height=200)
+    with open(path, "wb") as handle:
+        writer.write(handle)
+    return path
+
+
+def make_linked_pdf(directory: str, name: str) -> str:
+    """Write a 6-page PDF where page 1 links to page 5, with outline Chapter 1 (p1) > Section 1.1 (p2), Chapter 5 (p5)."""
+    path = os.path.join(directory, name)
+    writer = PdfWriter()
+    for offset in range(6):
+        writer.add_blank_page(width=200 + offset, height=200)
+    source_page, target_page = writer.pages[0], writer.pages[4]
+    annotation = DictionaryObject()
+    annotation[NameObject("/Type")] = NameObject("/Annot")
+    annotation[NameObject("/Subtype")] = NameObject("/Link")
+    annotation[NameObject("/Rect")] = ArrayObject(NumberObject(value) for value in (0, 0, 100, 100))
+    annotation[NameObject("/Dest")] = ArrayObject([target_page.indirect_reference, NameObject("/Fit")])
+    source_page[NameObject("/Annots")] = ArrayObject([writer._add_object(annotation)])
+    chapter_one = writer.add_outline_item("Chapter 1", 0)
+    writer.add_outline_item("Section 1.1", 1, parent=chapter_one)
+    writer.add_outline_item("Chapter 5", 4)
     with open(path, "wb") as handle:
         writer.write(handle)
     return path
@@ -358,7 +381,7 @@ class DropZoneTests(AppTestCase):
         self.assertIn("Could not read PDF", self.dialogs[0])
 
 
-class OperationOutputTests(AppTestCase):
+class OperationTestCase(AppTestCase):
     """The worker body runs inline here: after() needs a mainloop unittest does not run."""
 
     def run_inline(self, mode, paths, payload):
@@ -386,6 +409,8 @@ class OperationOutputTests(AppTestCase):
         """Page widths of one output, which identify the source pages and their order."""
         return [int(page.mediabox.width) for page in PdfReader(os.path.join(directory, name)).pages]
 
+
+class OperationOutputTests(OperationTestCase):
     def test_named_ranges_write_one_file_each(self):
         out = self.run_operation("named", [("Intro", 1, 2), ("Body", 3, 6)])
         self.assertEqual(self.page_counts(out), {"Body.pdf": 4, "Intro.pdf": 2})
@@ -463,6 +488,82 @@ class OperationOutputTests(AppTestCase):
         self.run_inline("keep", [os.path.join(self.work, "missing.pdf")], ("1-2", "kept.pdf"))
         self.assertIn("Error", self.dialogs[-1])
         self.assertNotIn("Stopped after writing", self.dialogs[-1])
+
+
+class LinksAndBookmarksTests(OperationTestCase):
+    """Internal links and bookmarks follow their pages; ones pointing at a missing page are dropped."""
+
+    def setUp(self):
+        super().setUp()
+        self.linked = make_linked_pdf(self.work, "linked.pdf")
+
+    def outline_pages(self, directory, name):
+        """(title, zero-based target page index) for every outline entry, depth-first."""
+        reader = PdfReader(os.path.join(directory, name))
+
+        def walk(items):
+            for item in items:
+                if isinstance(item, list):
+                    yield from walk(item)
+                else:
+                    yield item.title, reader.get_destination_page_number(item)
+
+        return list(walk(reader.outline))
+
+    def link_target(self, directory, name, page_index):
+        """Zero-based target page index of the link annotation on one page, or None."""
+        reader = PdfReader(os.path.join(directory, name))
+        for annotation in reader.pages[page_index].get("/Annots", []):
+            annotation = annotation.get_object()
+            if annotation.get("/Subtype") == "/Link":
+                target = annotation["/Dest"][0]
+                return next(i for i, page in enumerate(reader.pages) if page.indirect_reference == target)
+        return None
+
+    def test_keep_subset_including_the_link_target_remaps_it(self):
+        out = self.run_operation("keep", ("1, 2, 5", "kept.pdf"), paths=[self.linked])
+        self.assertEqual(self.link_target(out, "kept.pdf", 0), 2)
+
+    def test_keep_subset_excluding_the_link_target_drops_it(self):
+        out = self.run_operation("keep", ("1, 2, 3", "kept.pdf"), paths=[self.linked])
+        self.assertIsNone(self.link_target(out, "kept.pdf", 0))
+
+    def test_reorder_carries_the_link_and_bookmarks_to_their_new_pages(self):
+        out = self.run_operation("reorder", ("5, 1", "order.pdf"), paths=[self.linked])
+        self.assertEqual(self.outline_pages(out, "order.pdf"), [("Chapter 1", 1), ("Chapter 5", 0)])
+        self.assertEqual(self.link_target(out, "order.pdf", 1), 0)
+
+    def test_count_split_gives_each_file_only_its_own_bookmarks(self):
+        out = self.run_operation("count", (4, "batch"), paths=[self.linked])
+        self.assertEqual(self.outline_pages(out, "batch-1.pdf"), [("Chapter 1", 0), ("Section 1.1", 1)])
+        self.assertEqual(self.outline_pages(out, "batch-2.pdf"), [("Chapter 5", 0)])
+        self.assertIsNone(self.link_target(out, "batch-1.pdf", 0))
+
+    def test_merge_offsets_the_second_files_link_and_bookmarks(self):
+        out = self.run_operation("merge", "all.pdf", paths=[self.linked, self.linked])
+        self.assertEqual(
+            self.outline_pages(out, "all.pdf"),
+            [("Chapter 1", 0), ("Section 1.1", 1), ("Chapter 5", 4),
+             ("Chapter 1", 6), ("Section 1.1", 7), ("Chapter 5", 10)],
+        )
+        self.assertEqual(self.link_target(out, "all.pdf", 0), 4)
+        self.assertEqual(self.link_target(out, "all.pdf", 6), 10)
+
+    def test_link_written_as_a_bare_page_number_is_remapped(self):
+        # pypdf's Link helper writes a page number, not a page reference; append drops it before pypdf 6.16.
+        path = os.path.join(self.work, "numbered.pdf")
+        writer = PdfWriter()
+        for offset in range(6):
+            writer.add_blank_page(width=200 + offset, height=200)
+        writer.add_annotation(page_number=0, annotation=Link(rect=(0, 0, 100, 100), target_page_index=4))
+        with open(path, "wb") as handle:
+            writer.write(handle)
+        out = self.run_operation("keep", ("1, 5", "kept.pdf"), paths=[path])
+        self.assertEqual(self.link_target(out, "kept.pdf", 0), 1)
+
+    def test_dropped_parent_bookmark_stays_as_a_heading_over_surviving_children(self):
+        out = self.run_operation("keep", ("2-6", "kept.pdf"), paths=[self.linked])
+        self.assertEqual(self.outline_pages(out, "kept.pdf"), [("Chapter 1", None), ("Section 1.1", 0), ("Chapter 5", 3)])
 
 
 class ValidationTests(AppTestCase):

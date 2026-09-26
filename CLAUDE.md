@@ -47,6 +47,7 @@ Executable is a frozen snapshot — rebuild after `slicepdf.py` changes.
 - Output folder defaults to the source PDF folder; another can be chosen.
 - `__version__` in `slicepdf.py` is the single version source: shown in the window title, read by `SlicePDF.spec` for the exe's Windows file properties, and rewritten by the release workflow.
 - Errors surface via `messagebox`; operations run on a daemon thread with updates marshalled through `self.after()`.
+- Internal links and bookmarks carry over via `PdfWriter.append`; ones pointing at a page the output lacks are dropped. A dropped parent bookmark with surviving children stays as a destination-less heading.
 
 ## Rules
 
