@@ -520,8 +520,7 @@ class App(ctk.CTk):
             stem = os.path.splitext(os.path.basename(paths[0]))[0]
             used = set()
             if mode == "merge":
-                pages = [(reader, page) for reader in readers for page in range(len(reader.pages))]
-                outputs = [(pages, safe_filename(payload or f"{stem}-merged.pdf", "merged"))]
+                outputs = [(None, safe_filename(payload or f"{stem}-merged.pdf", "merged"))]
             elif mode == "named":
                 outputs = [(list(range(start - 1, end)), safe_filename(name, f"chapter-{index}")) for index, (name, start, end) in enumerate(payload, 1)]
             elif mode == "count":
@@ -533,9 +532,11 @@ class App(ctk.CTk):
                 outputs = [(self._select_pages(mode, payload[0], total_pages), safe_filename(payload[1] or f"{stem}-output.pdf", "output"))]
             for index, (pages, filename) in enumerate(outputs, 1):
                 writer = PdfWriter()
-                for page in pages:
-                    reader, page_index = page if mode == "merge" else (readers[0], page)
-                    writer.add_page(reader.pages[page_index])
+                if mode == "merge":
+                    for reader in readers:
+                        writer.append(reader)
+                else:
+                    writer.append(readers[0], pages=pages)
                 filename = unique_filename(filename, destination, used)
                 partial = os.path.join(destination, filename)
                 with open(partial, "xb") as output_file:
