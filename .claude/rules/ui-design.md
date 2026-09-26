@@ -17,27 +17,59 @@ Every color is a module constant in `slicepdf.py` (`PAPER`…`ERROR`) — those 
 No literal hex anywhere else, no color outside them. No blue, purple, gradients, heavy shadows, pure-black
 surfaces. Light mode only; no dark theme.
 
+| Role | Constant |
+|---|---|
+| Window / workspace · sidebar · panels and entries | `PAPER` · `SIDEBAR` · `SURFACE` |
+| Primary text · secondary text, placeholders, idle sidebar items | `INK` · `MUTED` |
+| Borders, hairlines, hover fill | `LINE` |
+| Actions: primary fill, outlined borders and text, brand eyebrow · primary hover | `ACCENT` · `ACCENT_DARK` |
+| Active sidebar item | `SELECTED` |
+| Message line after a run — finished · failed | `SUCCESS` · `ERROR` |
+
+`SUCCESS`/`ERROR` colour the message line only, never a badge or decoration.
+
 ## Typography
 
 `resolve_fonts()` is the source of truth. Manrope only — display headings 800 via the separate
 `Manrope ExtraBold` GDI family, body/controls via `Manrope`. Never Segoe UI, never the CustomTkinter
 Roboto default. `FONT_FALLBACK` (`Corbel`) fires only when registration failed; a test asserts it doesn't.
 
+Roles (`self.fonts` keys): `display` operation title · `brand` wordmark · `body` controls and text ·
+`strong` run button and headlines · `small` hints, paths, messages · `label` uppercase field labels and
+eyebrows (the text itself is written in capitals).
+
 ## Layout
 
 - Left sidebar is the **only** operation selector: 7 text-first buttons, no dropdown, no icons.
-  Active = `SELECTED` bg + `INK` text.
+  Active = `SELECTED` bg + `INK` text. Sidebar foot: muted `About SlicePDF` → one small window with
+  version and GitHub, website, releases links (`LINKS`).
 - Workspace, in order: operation title · one description · source panel · drop zone · operation-specific
-  fields · output row · single `Run operation` button.
+  fields with their live outcome hint · output row (folder · `Choose folder` · single `Run operation`) ·
+  progress bar + `Cancel` while working · message line.
 - Show only the fields the selected operation needs. Preserve the chosen source across operation switches.
+- Button hierarchy: `Run operation` is the only filled button. Everything else is outlined (`ACCENT` border
+  and text) or a transparent text button. Corners 3–4 px, 1 px `LINE` borders, entries and action-row buttons 36 px high.
+- Surfaces state facts, never placeholders: empty source panel shows no fake metadata; the drop zone
+  headline switches to replacing once a PDF is loaded; long folder paths shorten from the left
+  (`short_path`) so the last folder names stay readable.
 - Minimum window 760×600 must stay usable. The fields area carries a small requested `height` for exactly
   this reason — grid clips from the bottom (silently dropping the action bar) when requested height exceeds
   the window.
 
 ## Do not add
 
-Operation dropdown · recent files · history · settings · statistics or metrics · dark mode · icons or emoji ·
-duplicate file selectors · competing primary actions · cards that only repeat what's already on screen.
+Operation dropdown · recent files · history · settings screens (remembered state stays silent, like the
+output folder) · statistics or metrics · dark mode · icons or emoji · duplicate file selectors · competing
+primary actions · cards that only repeat what's already on screen · slogan badges that describe nothing
+the user can act on.
+
+## Copy
+
+- Plain words a non-technical user would say: "Choose PDF…", "Pages to delete", "Save to …".
+- The desk metaphor is the voice ("Place a PDF on the desk", "Nothing on the desk yet") — keep it to
+  headlines and empty states, never in errors.
+- Buttons name the action.
+- Errors say what to fix, in one sentence, naming the row or limit involved.
 
 ## Interaction invariants
 
