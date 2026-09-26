@@ -1,4 +1,4 @@
-# SlicePDF
+# <img src="docs/favicon.svg" alt="" width="32" height="32"> SlicePDF
 
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D4)
 ![Python](https://img.shields.io/badge/python-3.14-3776AB)

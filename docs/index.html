@@ -9,7 +9,10 @@
 <meta property="og:title" content="SlicePDF — everyday PDF edits">
 <meta property="og:description" content="Split by named ranges, delete or keep pages, trim, reorder, merge. Windows, MIT licensed.">
 <meta property="og:url" content="https://mithunwijayasiri.github.io/SlicePDF/">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23E6E8E3'/><rect x='7' y='4' width='18' height='24' fill='%232233C9'/><path d='M4 12h24M4 21h24' stroke='%23FF2E63' stroke-width='2.5'/></svg>">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#ffc629">
 <link rel="preload" href="fonts/manrope-regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/manrope-extrabold.woff2" as="font" type="font/woff2" crossorigin>
 <style>
@@ -21,13 +24,13 @@
 </style>
 <style>
 :root{
-  --stone:#e6e8e3; --rule:#d3d7cf; --sheet:#fbfbf9;
-  --ink:#15181b; --muted:#5f666b;
-  --blue:#2233c9; --pink:#ff2e63;
+  --stone:#ecedef; --rule:#d8dade; --sheet:#fbfbfc;
+  --ink:#17191f; --muted:#5d6068;
+  --yellow:#ffc629; --gold:#8c6200;
   --sans:'Manrope','Segoe UI',system-ui,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
   --radius:14px;
-  --shadow:0 1px 0 var(--rule), 0 18px 40px rgba(21,24,27,.07), 0 2px 10px rgba(21,24,27,.04);
+  --shadow:0 1px 0 var(--rule), 0 18px 40px rgba(23,25,31,.07), 0 2px 10px rgba(23,25,31,.04);
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%; scroll-behavior:smooth; scroll-padding-top:72px}
@@ -39,9 +42,9 @@ body{
 }
 h1,h2,h3{margin:0; font-weight:800; letter-spacing:-.03em; line-height:1.05; text-wrap:balance}
 p{ text-wrap:pretty }
-a{color:var(--blue); text-decoration-thickness:1px; text-underline-offset:3px}
-a:hover{color:var(--pink)}
-:focus-visible{outline:2.5px solid var(--pink); outline-offset:3px}
+a{color:var(--ink); text-decoration-color:var(--yellow); text-decoration-thickness:2px; text-underline-offset:3px}
+a:hover{text-decoration-color:var(--ink)}
+:focus-visible{outline:2.5px solid var(--ink); outline-offset:3px}
 .wrap{width:min(1100px,calc(100% - 44px)); margin-inline:auto}
 @media(max-width:560px){ .wrap{width:min(1100px,calc(100% - 28px))} }
 
@@ -49,21 +52,21 @@ a:hover{color:var(--pink)}
 .ruler{position:fixed; inset:0 auto 0 0; width:64px; display:none; z-index:5; pointer-events:none; opacity:.55}
 .ruler .scale{position:absolute; inset:12vh 0 12vh auto; right:0; width:100%}
 .ruler .tick{position:absolute; right:0; height:1px; width:9px; background:var(--rule)}
-.ruler .tick.major{width:20px; background:#b9bfb6}
-.ruler .num{position:absolute; right:26px; transform:translateY(-50%); font-family:var(--mono); font-size:10px; color:#98a09a}
-.ruler .cursor{position:absolute; right:0; width:34px; height:2px; background:var(--pink)}
-.ruler .cursor b{position:absolute; right:0; top:6px; font-family:var(--mono); font-size:10px; font-weight:500; color:var(--pink); white-space:nowrap}
+.ruler .tick.major{width:20px; background:#b8bbc2}
+.ruler .num{position:absolute; right:26px; transform:translateY(-50%); font-family:var(--mono); font-size:10px; color:#9396a0}
+.ruler .cursor{position:absolute; right:0; width:34px; height:2px; background:var(--ink)}
+.ruler .cursor b{position:absolute; right:0; top:6px; font-family:var(--mono); font-size:10px; font-weight:500; color:var(--ink); white-space:nowrap}
 @media (min-width:980px){ .ruler{display:block} }
 
 /* ---------- masthead ---------- */
 .masthead{display:flex; flex-wrap:wrap; gap:12px 26px; align-items:center; padding:22px 0 0}
 .wordmark{font-weight:800; font-size:20px; letter-spacing:-.035em; display:flex; align-items:center; gap:10px}
-.wordmark i{width:26px; height:26px; border-radius:6px; background:var(--ink); display:grid; place-items:center; color:#fff; font-style:normal; font-size:13px; font-weight:800; letter-spacing:-.04em}
+.wordmark img{display:block}
 .masthead .meta{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; align-items:center}
 .masthead .meta span{font-family:var(--mono); font-size:11px; color:var(--muted); padding:5px 9px; border:1px solid var(--rule); background:var(--sheet); border-radius:999px}
 
 /* pill nav */
-.pillnav{position:sticky; top:12px; z-index:4; display:flex; gap:8px; margin:20px 0 0; padding:8px; width:fit-content; max-width:100%; overflow:auto; scrollbar-width:none; background:rgba(251,251,249,.92); backdrop-filter:blur(10px); border:1px solid var(--rule); border-radius:999px; box-shadow:0 6px 22px rgba(21,24,27,.08)}
+.pillnav{position:sticky; top:12px; z-index:4; display:flex; gap:8px; margin:20px 0 0; padding:8px; width:fit-content; max-width:100%; overflow:auto; scrollbar-width:none; background:rgba(251,251,252,.92); backdrop-filter:blur(10px); border:1px solid var(--rule); border-radius:999px; box-shadow:0 6px 22px rgba(23,25,31,.08)}
 .pillnav::-webkit-scrollbar{display:none}
 .pillnav a{flex:0 0 auto; padding:7px 14px; border-radius:999px; font-family:var(--mono); font-size:12px; font-weight:500; text-decoration:none; color:var(--muted); border:1px solid transparent}
 .pillnav a:hover{color:var(--ink); background:#fff; border-color:var(--rule)}
@@ -73,19 +76,20 @@ a:hover{color:var(--pink)}
 /* ---------- hero ---------- */
 .hero{display:grid; grid-template-columns:1.08fr .92fr; gap:34px 36px; align-items:center; padding:clamp(28px,6vh,52px) 0 0}
 .hero h1{font-size:clamp(36px,5.6vw,62px); line-height:.98}
-.hero h1 em{font-style:normal; color:var(--blue)}
-.hero .lede{max-width:48ch; margin:18px 0 0; color:#3b4145; font-size:clamp(16px,1.8vw,18.5px); line-height:1.6}
+.hero h1 em{font-style:normal; background:linear-gradient(transparent 56%, var(--yellow) 56%, var(--yellow) 90%, transparent 90%); -webkit-box-decoration-break:clone; box-decoration-break:clone}
+.hero .lede{max-width:48ch; margin:18px 0 0; color:#3a3d45; font-size:clamp(16px,1.8vw,18.5px); line-height:1.6}
 .hero-copy .cta{margin-top:26px}
 .hero-copy .cta-note{margin:10px 0 0; font-family:var(--mono); font-size:11.5px; line-height:1.7; color:var(--muted)}
 .hero-copy .cta-note a{color:var(--muted)}
 .eyebrow{display:inline-flex; align-items:center; gap:8px; margin-bottom:16px; padding:6px 10px; background:var(--sheet); border:1px solid var(--rule); border-radius:999px; font-family:var(--mono); font-size:11px; color:var(--muted)}
-.eyebrow b{width:7px; height:7px; border-radius:50%; background:var(--pink); display:inline-block}
+.eyebrow b{width:7px; height:7px; border-radius:50%; background:var(--yellow); display:inline-block}
 
 /* app window mock: mid-run, so Cancel and the remembered folder are on screen */
 .hero-visual{margin:0; min-width:0}
 .win{overflow:hidden; background:var(--sheet); border:1px solid var(--rule); border-radius:12px; box-shadow:var(--shadow)}
 .win-bar{display:flex; align-items:center; height:34px; padding-left:14px; border-bottom:1px solid var(--rule); background:#fff}
-.win-title{font-size:12px; font-weight:600; color:var(--muted)}
+.win-title{display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--muted)}
+.win-title img{display:block}
 .win-ctl{margin-left:auto; display:flex; height:100%}
 .win-ctl i{position:relative; width:42px; height:100%}
 .win-ctl i::before,.win-ctl i::after{content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%)}
@@ -94,7 +98,7 @@ a:hover{color:var(--pink)}
 .win-ctl .close::before,.win-ctl .close::after{width:12px; height:1px; background:var(--muted); transform:translate(-50%,-50%) rotate(45deg)}
 .win-ctl .close::after{transform:translate(-50%,-50%) rotate(-45deg)}
 .win-body{display:grid; grid-template-columns:150px 1fr}
-.win-side{padding:14px 8px; background:#f0f1ec; border-right:1px solid var(--rule)}
+.win-side{padding:14px 8px; background:#f2f3f5; border-right:1px solid var(--rule)}
 .win-side strong{display:block; padding:0 6px; font-size:15px; font-weight:800; letter-spacing:-.03em}
 .win-side b{display:block; margin:14px 6px 6px; font-family:var(--mono); font-size:9.5px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
 .win-side ul{list-style:none; margin:0; padding:0; display:grid; gap:2px}
@@ -114,10 +118,10 @@ a:hover{color:var(--pink)}
 .win-run{padding:7px 10px; border-radius:6px; background:var(--ink); color:#fff; font-size:11.5px; font-weight:700; opacity:.3; white-space:nowrap}
 .win-progress{display:flex; align-items:center; gap:10px}
 .win-progress .bar{flex:1; height:5px; border-radius:999px; background:var(--rule); overflow:hidden}
-.win-progress .bar i{display:block; width:66.7%; height:100%; border-radius:inherit; background:var(--blue)}
+.win-progress .bar i{display:block; width:66.7%; height:100%; border-radius:inherit; background:var(--yellow)}
 .win-cancel{display:flex; align-items:center; gap:6px}
-.win-cancel span{padding:4px 10px; border:1px solid var(--pink); border-radius:6px; color:var(--pink); font-size:11px; font-weight:700}
-.pin{display:inline-grid; place-items:center; flex:0 0 auto; width:15px; height:15px; border-radius:50%; background:var(--pink); color:#fff; font:500 9.5px/1 var(--mono)}
+.win-cancel span{padding:4px 10px; border:1px solid var(--ink); border-radius:6px; color:var(--ink); font-size:11px; font-weight:700}
+.pin{display:inline-grid; place-items:center; flex:0 0 auto; width:15px; height:15px; border-radius:50%; background:var(--ink); color:var(--yellow); font:500 9.5px/1 var(--mono)}
 .win-notes{display:grid; gap:6px; margin:14px 0 0; padding:0 4px; font-family:var(--mono); font-size:11.5px; line-height:1.6; color:var(--muted)}
 .win-notes span{display:flex; gap:9px; align-items:baseline}
 .win-notes .pin{position:relative; top:3px}
@@ -135,43 +139,43 @@ a:hover{color:var(--pink)}
 .slicer .head{display:flex; flex-wrap:wrap; gap:8px 20px; align-items:baseline; justify-content:space-between; margin-bottom:26px}
 .slicer .doc{margin:0; font-family:var(--mono); font-size:13px}
 .slicer .doc b{font-weight:500}
-.slicer .doc::before{content:""; display:inline-block; width:8px; height:8px; border-radius:50%; background:#27c93f; margin-right:8px; vertical-align:middle; box-shadow:0 0 0 4px rgba(39,201,63,.15)}
+.slicer .doc::before{content:""; display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--yellow); margin-right:8px; vertical-align:middle; box-shadow:0 0 0 4px rgba(255,198,41,.25)}
 .hint{margin:0; font-family:var(--mono); font-size:12px; color:var(--muted)}
 .no-js .hint{display:none}
 
 .strip{position:relative; height:104px; touch-action:none; user-select:none}
 .ticks{position:absolute; inset:0 0 26px 0; display:flex; gap:1px}
-.ticks i{flex:1; background:#dfe2dc; transform-origin:bottom; border-radius:1px}
-.band{position:absolute; top:0; bottom:26px; background:var(--blue); mix-blend-mode:multiply; border-radius:2px}
+.ticks i{flex:1; background:#e0e2e6; transform-origin:bottom; border-radius:1px}
+.band{position:absolute; top:0; bottom:26px; background:var(--yellow); mix-blend-mode:multiply; border-radius:2px}
 .band:nth-of-type(1){opacity:1} .band:nth-of-type(2){opacity:.58} .band:nth-of-type(3){opacity:.32}
-.cut{position:absolute; top:-9px; bottom:17px; width:2px; margin-left:-1px; padding:0; border:0; background:var(--pink); cursor:ew-resize; z-index:3}
+.cut{position:absolute; top:-9px; bottom:17px; width:2px; margin-left:-1px; padding:0; border:0; background:var(--ink); cursor:ew-resize; z-index:3}
 .cut::after{content:""; position:absolute; left:-10px; right:-10px; top:0; bottom:0}
-.cut b{position:absolute; top:-1px; left:50%; transform:translateX(-50%); width:13px; height:13px; background:var(--pink); border-radius:50%; transition:transform .15s}
-.cut span{position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); padding:0 5px; background:var(--sheet); font-family:var(--mono); font-size:11px; font-weight:500; color:var(--pink); white-space:nowrap; border-radius:4px}
+.cut b{position:absolute; top:-1px; left:50%; transform:translateX(-50%); width:13px; height:13px; background:var(--ink); border-radius:50%; transition:transform .15s}
+.cut span{position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); padding:0 5px; background:var(--sheet); font-family:var(--mono); font-size:11px; font-weight:500; color:var(--ink); white-space:nowrap; border-radius:4px}
 .cut:hover b,.cut:focus-visible b{transform:translateX(-50%) scale(1.4)}
-.scalebar{position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; color:#98a09a}
+.scalebar{position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between; font-family:var(--mono); font-size:11px; color:var(--muted)}
 
 .rows{list-style:none; margin:26px 0 0; padding:0; border-top:1px solid var(--rule)}
 .rows li{display:grid; grid-template-columns:12px minmax(130px,1fr) 96px 82px 1.05fr; align-items:center; gap:16px; padding:14px 0; border-bottom:1px solid var(--rule)}
-.rows .swatch{width:10px; height:10px; background:var(--blue); border-radius:2px}
+.rows .swatch{width:10px; height:10px; background:var(--yellow); border-radius:2px}
 .rows li:nth-child(2) .swatch{opacity:.58}
 .rows li:nth-child(3) .swatch{opacity:.32}
 .rows input{width:100%; padding:5px 8px; margin-left:-8px; border:1px solid transparent; background:transparent; color:var(--ink);
   font:600 16px/1.3 var(--sans); border-radius:8px}
 .rows input:hover{border-color:var(--rule); background:#fff}
-.rows input:focus{border-color:var(--blue); background:#fff; outline:0}
+.rows input:focus{border-color:var(--ink); background:#fff; outline:0}
 .rows .pp,.rows .ct{font-family:var(--mono); font-size:12px; color:var(--muted)}
 .rows .out{font-family:var(--mono); font-size:13px; font-weight:500; overflow-wrap:anywhere}
-.rows .out i{font-style:normal; font-weight:400; color:var(--blue); margin-right:9px}
+.rows .out i{font-style:normal; font-weight:400; color:var(--gold); margin-right:9px}
 .slicer .foot{padding:18px 0 20px; margin:0; max-width:78ch; font-family:var(--mono); font-size:12px; line-height:1.95; color:var(--muted)}
 .slicer .foot b{color:var(--ink); font-weight:500}
 
 /* ---------- calls to action ---------- */
 .cta{display:flex; flex-wrap:wrap; align-items:center; gap:16px 28px; margin:32px 0 0}
-.btn{display:inline-flex; align-items:center; gap:12px; padding:17px 26px; background:var(--pink); color:#fff; text-decoration:none; border-radius:999px;
-  font:800 16.5px/1 var(--sans); letter-spacing:-.025em; box-shadow:0 8px 20px rgba(255,46,99,.24); transition:transform .15s, background .15s, box-shadow .15s}
-.btn small{font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:0; opacity:.92; color:#fff}
-.btn:hover{color:#fff; background:#ff1550; transform:translateY(-1px); box-shadow:0 10px 26px rgba(255,46,99,.28)}
+.btn{display:inline-flex; align-items:center; gap:12px; padding:17px 26px; background:var(--yellow); color:var(--ink); text-decoration:none; border-radius:999px;
+  font:800 16.5px/1 var(--sans); letter-spacing:-.025em; box-shadow:0 8px 20px rgba(255,198,41,.35); transition:transform .15s, background .15s, box-shadow .15s}
+.btn small{font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:0; opacity:.8; color:var(--ink)}
+.btn:hover{color:var(--ink); background:#ffb800; transform:translateY(-1px); box-shadow:0 10px 26px rgba(255,184,0,.4)}
 .btn:active{transform:translateY(0)}
 .btn-secondary{display:inline-flex; align-items:center; gap:8px; padding:12px 18px; border-radius:999px; border:1px solid var(--rule); background:var(--sheet); color:var(--ink); font:600 14px/1 var(--sans); text-decoration:none}
 .btn-secondary:hover{border-color:var(--ink); color:var(--ink)}
@@ -185,39 +189,39 @@ section{padding:clamp(56px,9vh,96px) 0 0}
 
 .ops{list-style:none; margin:18px 0 0; padding:0; display:grid; gap:12px}
 .ops li{display:grid; grid-template-columns:1.25fr .95fr 1.05fr; gap:14px 24px; padding:20px 20px; background:var(--sheet); border:1px solid var(--rule); border-radius:var(--radius); align-items:start}
-.ops li:hover{border-color:#c8cec7}
+.ops li:hover{border-color:#c9ccd2}
 .ops h3{font-size:17.5px; display:flex; gap:10px; align-items:baseline}
-.ops h3 i{font-style:normal; font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.06em; color:#98a09a; flex:0 0 auto}
+.ops h3 i{font-style:normal; font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--muted); flex:0 0 auto}
 .ops p{margin:8px 0 0; max-width:34ch; color:var(--muted); font-size:14px; line-height:1.55}
-.ops .k{display:block; margin-bottom:8px; font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:#98a09a}
+.ops .k{display:block; margin-bottom:8px; font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
 .ops code{display:inline-block; padding:5px 8px; border:1px solid var(--rule); background:#fff; border-radius:8px; font-family:var(--mono); font-size:13px}
 .ops .yield{margin:0; max-width:none; font-family:var(--mono); font-size:13px; line-height:1.85; color:var(--ink)}
-.ops .yield em{font-style:normal; color:var(--blue)}
+.ops .yield em{font-style:normal; color:var(--gold)}
 
-/* use cases: bars drawn to real page counts, pink gaps are the cuts */
+/* use cases: bars drawn to real page counts, ink gaps are the cuts */
 .cases{display:grid; gap:14px; margin-top:18px}
 .case{display:grid; grid-template-columns:.8fr 1.2fr; gap:22px 36px; padding:24px; background:var(--sheet); border:1px solid var(--rule); border-radius:var(--radius)}
-.case .tag{font-family:var(--mono); font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:#98a09a}
+.case .tag{font-family:var(--mono); font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted)}
 .case h3{margin-top:10px; font-size:clamp(19px,2.2vw,23px); line-height:1.15}
 .case p{margin:10px 0 0; max-width:40ch; color:var(--muted); font-size:14.5px; line-height:1.6}
 .case-op{display:inline-flex; align-items:center; gap:9px; margin-top:16px; font-family:var(--mono); font-size:12px; font-weight:500; text-decoration:none}
-.case-op::before{content:""; width:14px; height:2px; background:var(--pink)}
+.case-op::before{content:""; width:14px; height:2px; background:var(--ink)}
 .case-fig{margin:0; min-width:0; display:flex; flex-direction:column; gap:8px}
-.fig-label{display:flex; justify-content:space-between; gap:12px; font-family:var(--mono); font-size:10.5px; color:#98a09a}
+.fig-label{display:flex; justify-content:space-between; gap:12px; font-family:var(--mono); font-size:10.5px; color:var(--muted)}
 .fig-label + .fig-label{margin-top:8px}
-.seg{display:flex; gap:2px; height:38px; border-radius:6px; overflow:hidden; background:var(--pink)}
-.seg span{flex:var(--w); min-width:0; display:flex; align-items:center; padding:0 8px; background:var(--blue); color:#fff; font:500 11px/1 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-.seg span:nth-child(3n+2){background:#7d87dd}
-.seg span:nth-child(3n){background:#b6bbea; color:var(--ink)}
+.seg{display:flex; gap:2px; height:38px; border-radius:6px; overflow:hidden; background:var(--ink)}
+.seg span{flex:var(--w); min-width:0; display:flex; align-items:center; padding:0 8px; background:var(--yellow); color:var(--ink); font:500 11px/1 var(--mono); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.seg span:nth-child(3n+2){background:#ffdb70}
+.seg span:nth-child(3n){background:#ffedb8}
 .seg.apart{gap:6px; background:none; border-radius:0}
 .seg.apart span{border-radius:5px}
 .seg.joined{gap:0}
 .pagegrid{display:grid; grid-template-columns:repeat(24,1fr); gap:3px}
 .pagegrid i{aspect-ratio:3/4; border-radius:2px; background:#fff; border:1px solid var(--rule)}
-.pagegrid i.on{background:var(--blue); border-color:var(--blue)}
+.pagegrid i.on{background:var(--yellow); border-color:#e5a800}
 .no-js .pagegrid{display:none}
 .case-io{display:grid; grid-template-columns:1fr 1fr; gap:14px 22px; margin-top:12px; padding-top:16px; border-top:1px solid var(--rule)}
-.case-io b{display:block; margin-bottom:8px; font-family:var(--mono); font-size:10.5px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:#98a09a}
+.case-io b{display:block; margin-bottom:8px; font-family:var(--mono); font-size:10.5px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
 .case-io code{display:block; width:fit-content; max-width:100%; margin:0 0 5px; padding:4px 8px; border:1px solid var(--rule); background:#fff; border-radius:7px; font-family:var(--mono); font-size:12px; overflow-wrap:anywhere}
 .case-io small{display:block; margin-top:8px; font-family:var(--mono); font-size:11.5px; color:var(--muted)}
 .files{list-style:none; margin:0; padding:0}
@@ -233,7 +237,7 @@ section{padding:clamp(56px,9vh,96px) 0 0}
 .install li{margin:0 0 12px; font-size:14.5px; line-height:1.55}
 .install li::marker{font-family:var(--mono); font-size:12px; color:var(--muted)}
 .install .note{margin:14px 0 0; color:var(--muted); font-size:14px}
-pre{position:relative; margin:16px 0 0; padding:16px 18px; background:var(--ink); color:#e8eae5; overflow-x:auto; border-radius:10px;
+pre{position:relative; margin:16px 0 0; padding:16px 18px; background:var(--ink); color:#e9eaee; overflow-x:auto; border-radius:10px;
   font-family:var(--mono); font-size:12.5px; line-height:1.85}
 pre span{color:#8f9aa6}
 .copy{position:absolute; right:10px; top:10px; padding:6px 10px; border-radius:999px; border:1px solid #2a3036; background:#23282e; color:#cbd5df; font-family:var(--mono); font-size:11px; cursor:pointer}
@@ -244,13 +248,13 @@ pre span{color:#8f9aa6}
 /* fine print: solid sheet = always happens, dashed outline = never happens */
 .fine{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px}
 .fine-col{padding:22px 22px 8px; background:var(--sheet); border:1px solid var(--rule); border-radius:var(--radius)}
-.fine-col.wont{background:transparent; border:1.5px dashed #b9bfb6}
+.fine-col.wont{background:transparent; border:1.5px dashed #b8bbc2}
 .fine h3{display:flex; align-items:center; gap:10px; font-size:18px}
-.fine h3::before{content:""; width:10px; height:10px; border-radius:2px; background:var(--blue)}
-.fine .wont h3::before{height:2px; border-radius:0; background:var(--pink)}
+.fine h3::before{content:""; width:10px; height:10px; border-radius:2px; background:var(--yellow)}
+.fine .wont h3::before{height:2px; border-radius:0; background:var(--ink)}
 .fine dl{margin:10px 0 0}
 .fine dl div{padding:12px 0; border-top:1px solid var(--rule)}
-.fine .wont dl div{border-top-style:dashed; border-top-color:#c8cec7}
+.fine .wont dl div{border-top-style:dashed; border-top-color:#c9ccd2}
 .fine dl div:first-child{border-top:0}
 .fine dt{font-size:15px; font-weight:700; letter-spacing:-.01em}
 .fine dd{margin:3px 0 0; color:var(--muted); font-size:14px; line-height:1.55}
@@ -299,7 +303,7 @@ footer nav a{font-family:var(--mono); font-size:11.5px}
 
 <div class="wrap">
   <header class="masthead">
-    <span class="wordmark"><i>S/</i> SlicePDF</span>
+    <span class="wordmark"><img src="favicon.svg" alt="" width="26" height="26"> SlicePDF</span>
     <div class="meta"><span>Windows</span><span>MIT</span><span>Portable</span></div>
   </header>
   <nav class="pillnav" aria-label="Sections">
@@ -324,7 +328,7 @@ footer nav a{font-family:var(--mono); font-size:11.5px}
       </div>
       <figure class="hero-visual">
         <div class="win" aria-hidden="true">
-          <div class="win-bar"><span class="win-title">SlicePDF</span><span class="win-ctl"><i class="min"></i><i class="max"></i><i class="close"></i></span></div>
+          <div class="win-bar"><span class="win-title"><img src="favicon.svg" alt="" width="14" height="14">SlicePDF</span><span class="win-ctl"><i class="min"></i><i class="max"></i><i class="close"></i></span></div>
           <div class="win-body">
             <div class="win-side">
               <strong>SlicePDF</strong>
