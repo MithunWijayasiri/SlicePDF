@@ -11,6 +11,7 @@ Windows desktop PDF utility for page-level operations: split by named ranges, de
 | `test_pdf_operations.py` | `unittest` suite for `pdf_operations`. |
 | `test_app.py` | GUI-level `unittest` suite; skips when Tk cannot open a window. |
 | `assets/fonts/` | Bundled Manrope statics (400/700/800) + `OFL.txt`. |
+| `assets/slicepdf.ico` | App icon: window title bars + exe (`SlicePDF.spec`). |
 | `SlicePDF.bat` | Double-click launcher → `pythonw slicepdf.py` (no console). |
 | `SlicePDF.spec` | PyInstaller config; source of truth for builds. |
 | `.github/workflows/build.yml` | CI on push + PR: compile, tests, Ruff, build, `SlicePDF.exe` artifact. |

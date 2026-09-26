@@ -41,7 +41,7 @@ version_info = VSVersionInfo(
     ],
 )
 
-datas = [('assets/fonts', 'assets/fonts')]
+datas = [('assets/fonts', 'assets/fonts'), ('assets/slicepdf.ico', 'assets')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('customtkinter')
@@ -75,6 +75,7 @@ exe = EXE(
     [],
     name='SlicePDF',
     version=version_info,
+    icon='assets/slicepdf.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

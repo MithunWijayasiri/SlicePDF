@@ -87,6 +87,9 @@ def resource_path(*parts: str) -> str:
     return os.path.join(base, *parts)
 
 
+ICON = resource_path("assets", "slicepdf.ico")
+
+
 def register_bundled_fonts() -> None:
     """Register the bundled Manrope faces for this process only. Call before Tk starts."""
     directory = resource_path("assets", "fonts")
@@ -188,6 +191,7 @@ class App(ctk.CTk):
         TkinterDnD.require(self)
         self.fonts = resolve_fonts()
         self.title(f"SlicePDF {__version__}")
+        self.iconbitmap(ICON)
         self.geometry("940x720")
         self.minsize(760, 600)
         self.configure(fg_color=PAPER)
@@ -487,6 +491,7 @@ class App(ctk.CTk):
             return
         about = ctk.CTkToplevel(self, fg_color=PAPER)
         about.title("About SlicePDF")
+        about.iconbitmap(ICON)
         about.resizable(False, False)
         about.transient(self)
         about.bind("<Escape>", lambda _event: about.destroy())
